@@ -36,6 +36,19 @@ def test_now_playing_phrase(router, transport):
     assert router.handle("cosa sta suonando") == "Sta suonando Time di PF."
 
 
+def test_play_title_containing_transport_word(router, transport, make_tidal):
+    # A play command whose title contains a transport word ("Don't Stop Me Now"
+    # -> "stop") must be played, not mistaken for a pause.
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://5.flc",
+                      "name": "Don't Stop Me Now"}]},
+    )
+    router.handle("metti Don't stop me now dei Queen", source="tidal")
+    assert ["playlist", "play", "tidal://5.flc"] in transport.commands()
+    assert ["pause", "1"] not in transport.commands()
+
+
 # -- TIDAL playback -------------------------------------------------------
 def test_play_song(router, transport, make_tidal):
     transport.responses["tidal"] = make_tidal(

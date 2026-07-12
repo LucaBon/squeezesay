@@ -338,7 +338,7 @@ if (!SR) {
 
   // mode: "off" (idle) | "manual" (one tap-to-talk shot) | "wake" (continuous,
   // listening for the wake word). `active` mirrors whether the recogniser runs.
-  let mode = "off", active = false, armed = false;
+  let mode = "off", active = false, armed = false, capTimer = null;
   const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   // A short, self-contained "listening" cue for hands-free wake (no asset/CDN).
@@ -367,10 +367,28 @@ if (!SR) {
     mode = "wake"; armed = false; configure(true);
     try { rec.start(); } catch (e) {}
   }
-  function stopAll() { mode = "off"; try { rec.stop(); } catch (e) {} }
+  function stopAll() {
+    mode = "off"; armed = false; clearTimeout(capTimer);
+    try { rec.stop(); } catch (e) {}
+  }
+
+  // Fuzzy token match so common it-IT mis-hearings of the wake word still fire
+  // ("impianto" vs "impianti"/"impiant"): equal, a ≥4-char prefix, or ≤1 edit.
+  function tokEq(a, b) {
+    if (a === b) return true;
+    if (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0, j = 0, edits = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { i++; j++; }
+      else { if (++edits > 1) return false;
+        if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+    }
+    return edits + (a.length - i) + (b.length - j) <= 1;
+  }
 
   // The command is the words AFTER the wake phrase; returns null if the wake
-  // phrase isn't present (as whole words, accent/case-insensitive).
+  // phrase isn't present (accent/case-insensitive, fuzzy per token).
   function commandAfterWake(text) {
     const ww = norm(wakeWord()).split(/\s+/).filter(Boolean);
     if (!ww.length) return null;
@@ -378,7 +396,7 @@ if (!SR) {
     const nw = words.map(norm);
     for (let i = 0; i + ww.length <= nw.length; i++) {
       let hit = true;
-      for (let j = 0; j < ww.length; j++) if (nw[i + j] !== ww[j]) { hit = false; break; }
+      for (let j = 0; j < ww.length; j++) if (!tokEq(nw[i + j], ww[j])) { hit = false; break; }
       if (hit) return words.slice(i + ww.length).join(" ");
     }
     return null;
@@ -394,15 +412,44 @@ if (!SR) {
     if ($("autosend").checked) { runCommand(txt, alts); }
     else { statusEl.textContent = "Controlla il testo (occhio ai nomi inglesi) e premi Invia."; $("text").focus(); }
   }
-  function handleWakeFinal(txt, alts) {
-    if (armed) { armed = false; beep(); runCommand(txt, alts); return; }
-    const after = commandAfterWake(txt);
-    if (after === null) return;  // just background chatter, ignore
-    beep();
-    if (after.trim()) {
-      const sAlts = (alts || []).map(commandAfterWake).filter(x => x && x.trim());
-      runCommand(after.trim(), sAlts.length ? sAlts : [after.trim()]);
-    } else { armed = true; statusEl.textContent = "Sì? Dimmi il comando…"; }
+  // Wake mode is CONTINUOUS: the recogniser finalises a long phrase in pieces,
+  // so acting on each piece would fire half-typed commands ("metti Don't",
+  // "metti Don't stop", ...). Instead we accumulate the whole utterance and send
+  // the command once, ~1s after you stop talking (debounce), then reset the
+  // session so the next command starts clean.
+  function wakeResult(e) {
+    // In this browser Chrome's continuous `results` are CUMULATIVE snapshots that
+    // grow entry by entry — each one repeats the words before it ("impianto",
+    // "impianto metti", "impianto metti Don't", ...), and even final entries do
+    // this. Joining them duplicates every word ("impianto impianto metti ..."),
+    // so take the single fullest (longest) transcript instead, which is the most
+    // complete snapshot; use its alternatives when it's a final result.
+    let best = null;
+    for (let i = 0; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (!best || r[0].transcript.length > best[0].transcript.length) best = r;
+    }
+    const txt = best ? (best[0].transcript || "").trim() : "";
+    const alts = best && best.isFinal ? Array.from(best, (a) => a.transcript) : null;
+
+    let after = commandAfterWake(txt);          // strips the wake word
+    if (after === null) {
+      if (!armed) { statusEl.textContent = "In ascolto… di' «" + wakeWord() + " …»"; return; }
+      after = txt;                              // armed in a fresh session: no wake word to strip
+    }
+    if (!armed) { armed = true; beep(); }       // wake word just heard
+    const cmd = after.trim();
+    if (!cmd) { statusEl.textContent = "Sì? Dimmi il comando…"; return; }
+
+    statusEl.textContent = "… " + cmd;
+    clearTimeout(capTimer);                     // keep waiting while words keep coming
+    capTimer = setTimeout(() => {
+      armed = false;
+      const strip = (s) => { const a = commandAfterWake(s); return a === null ? s : a; };
+      const cleanAlts = (alts || []).map(strip).filter((x) => x && x.trim());
+      runCommand(cmd, cleanAlts.length ? cleanAlts : [cmd]);
+      try { rec.stop(); } catch (e) {}          // reset the session; onend restarts fresh
+    }, 1000);
   }
 
   mic.onclick = () => {
@@ -427,20 +474,16 @@ if (!SR) {
     }
   };
   rec.onresult = (e) => {
+    if (mode === "wake") { wakeResult(e); return; }
+    // Manual mode: single-shot, show interim live, act on the final result.
     let finalTxt = "", finalAlts = null, interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
       if (r.isFinal) { finalTxt = r[0].transcript; finalAlts = Array.from(r, (a) => a.transcript); }
       else interim += r[0].transcript;
     }
-    if (interim && !finalTxt) {  // live feedback while speaking
-      if (mode === "manual") $("text").value = interim;
-      else statusEl.textContent = "…" + interim;
-      return;
-    }
-    if (!finalTxt) return;
-    if (mode === "wake") handleWakeFinal(finalTxt, finalAlts);
-    else handleManualFinal(finalTxt, finalAlts);
+    if (interim && !finalTxt) { $("text").value = interim; return; }  // live feedback
+    if (finalTxt) handleManualFinal(finalTxt, finalAlts);
   };
 
   // Restore the wake-mode toggle (needs a tap to actually start: browsers require

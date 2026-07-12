@@ -128,14 +128,23 @@ class Router:
         local = source == "local"
         auto = source == "auto"  # try local first, else TIDAL (default in the web app)
 
+        # A play command carries a title after the verb; its transport-sounding
+        # words ("Don't Stop Me Now" -> "stop", "Play" -> "play") must NOT be
+        # mistaken for transport controls, or the song is never played. "in pausa"
+        # stays an explicit pause even with "metti" ("metti in pausa").
+        is_play = bool(re.search(
+            r"\b(?:metti|rimetti|riproduci|suona|fai\s+partire|voglio\s+ascoltare)\b",
+            t, re.I))
+
         # 1) transport & info (source-independent)
-        if re.search(r"\b(pausa|ferma|stop)\b", t, re.I):
+        if re.search(r"\bin\s+pausa\b", t, re.I) or (
+                not is_play and re.search(r"\b(pausa|ferma|stop)\b", t, re.I)):
             return actions.pause(self.lms)
-        if re.search(r"\b(riprendi|riparti|continua|play)\b", t, re.I):
+        if not is_play and re.search(r"\b(riprendi|riparti|continua|play)\b", t, re.I):
             return actions.resume(self.lms)
-        if re.search(r"\b(success|prossim|avanti|salta)", t, re.I):
+        if not is_play and re.search(r"\b(success|prossim|avanti|salta)", t, re.I):
             return actions.next_track(self.lms)
-        if re.search(r"\b(precedent|indietro|torna)", t, re.I):
+        if not is_play and re.search(r"\b(precedent|indietro|torna)", t, re.I):
             return actions.previous_track(self.lms)
         if re.search(r"(alza|aumenta).{0,12}volume|pi[uù] forte", t, re.I):
             return actions.change_volume(self.lms, "up")
