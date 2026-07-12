@@ -338,7 +338,7 @@ if (!SR) {
 
   // mode: "off" (idle) | "manual" (one tap-to-talk shot) | "wake" (continuous,
   // listening for the wake word). `active` mirrors whether the recogniser runs.
-  let mode = "off", active = false, armed = false, capTimer = null;
+  let mode = "off", active = false, capTimer = null;
   const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   // A short, self-contained "listening" cue for hands-free wake (no asset/CDN).
@@ -360,15 +360,15 @@ if (!SR) {
   }
   function startManual() {
     if (active) { rec.stop(); return; }  // second tap stops
-    mode = "manual"; armed = false; configure(false);
+    mode = "manual"; configure(false);
     try { rec.start(); } catch (e) {}
   }
   function startWake() {
-    mode = "wake"; armed = false; configure(true);
+    mode = "wake"; configure(true);
     try { rec.start(); } catch (e) {}
   }
   function stopAll() {
-    mode = "off"; armed = false; clearTimeout(capTimer);
+    mode = "off"; clearTimeout(capTimer);
     try { rec.stop(); } catch (e) {}
   }
 
@@ -432,19 +432,22 @@ if (!SR) {
     const txt = best ? (best[0].transcript || "").trim() : "";
     const alts = best && best.isFinal ? Array.from(best, (a) => a.transcript) : null;
 
-    let after = commandAfterWake(txt);          // strips the wake word
+    // Only act on speech that actually contains the wake word: ambient noise
+    // (or a session restart every few seconds) must not trigger anything. No cue
+    // on merely hearing the word — a single beep confirms only when a real
+    // command is sent, so silence stays silent.
+    const after = commandAfterWake(txt);        // null when the wake word isn't present
     if (after === null) {
-      if (!armed) { statusEl.textContent = "In ascolto… di' «" + wakeWord() + " …»"; return; }
-      after = txt;                              // armed in a fresh session: no wake word to strip
+      statusEl.textContent = "In ascolto… di' «" + wakeWord() + " …»";
+      return;
     }
-    if (!armed) { armed = true; beep(); }       // wake word just heard
     const cmd = after.trim();
-    if (!cmd) { statusEl.textContent = "Sì? Dimmi il comando…"; return; }
+    if (!cmd) { statusEl.textContent = "Sì? Dimmi il comando…"; return; }  // just the wake word
 
     statusEl.textContent = "… " + cmd;
     clearTimeout(capTimer);                     // keep waiting while words keep coming
     capTimer = setTimeout(() => {
-      armed = false;
+      beep();                                   // confirm only when the command is sent
       const strip = (s) => { const a = commandAfterWake(s); return a === null ? s : a; };
       const cleanAlts = (alts || []).map(strip).filter((x) => x && x.trim());
       runCommand(cmd, cleanAlts.length ? cleanAlts : [cmd]);
