@@ -321,8 +321,38 @@ def test_handle_many_keeps_primary_when_all_miss(router, transport):
 
 def test_handle_many_empty(router):
     assert router.handle_many([]) == {
-        "speech": "Non ho sentito niente.", "used": "", "ok": False, "terms": []
+        "speech": "Non ho sentito niente.", "used": "", "ok": False,
+        "terms": [], "choices": []
     }
+
+
+def test_handle_many_exposes_tappable_choices(router, transport):
+    # A list command opens a numbered list -> the reply carries tappable choices
+    # (n + label, matching the spoken read-out) so the web app can render buttons.
+    transport.responses["artists"] = {"artists_loop": [{"id": 1, "artist": "Yes"}]}
+    transport.responses["albums"] = {
+        "albums_loop": [{"id": 345, "album": "90125"}, {"id": 9, "album": "Fragile"}]
+    }
+    res = router.handle_many(["quali album ho di Yes"], source="local")
+    assert res["choices"] == [
+        {"n": 1, "label": "90125"},
+        {"n": 2, "label": "Fragile"},
+    ]
+    # a bare pick afterwards doesn't re-open a list -> that reply has no buttons.
+    res2 = router.handle_many(["metti la 2"], source="local")
+    assert res2["speech"] == "Riproduco Fragile."
+    assert res2["choices"] == []
+
+
+def test_handle_many_plain_play_has_no_choices(router, transport, make_tidal):
+    # An unambiguous play is not a list -> no tappable choices.
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://1.flc", "name": "Time"}]},
+    )
+    res = router.handle_many(["riproduci Time"], source="tidal")
+    assert res["ok"] is True
+    assert res["choices"] == []
 
 
 def test_handle_many_passes_terms(router, transport, make_tidal):

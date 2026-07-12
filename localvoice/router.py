@@ -43,9 +43,14 @@ class Router:
     def __init__(self, lms):
         self.lms = lms
         self.candidates = None  # candidates from the last list command
+        # True when THIS turn opened a numbered list (a list command or a
+        # 'did you mean'), so the web client can render tappable choice buttons
+        # only for the reply that offers them, not on every later reply.
+        self._opened = False
 
     def _remember(self, result: dict) -> str:
         self.candidates = result["candidates"] or None
+        self._opened = bool(self.candidates)
         return result["speech"]
 
     def _played(self, result):
@@ -54,6 +59,7 @@ class Router:
         cands = getattr(result, "candidates", None)
         if cands:
             self.candidates = cands
+            self._opened = True
         return result
 
     def _play_auto(self, arg: str, tidal_fn):
@@ -83,7 +89,8 @@ class Router:
         (the primary one if none matched)."""
         alts = [a for a in (alternatives or []) if (a or "").strip()]
         if not alts:
-            return {"speech": "Non ho sentito niente.", "used": "", "ok": False, "terms": []}
+            return {"speech": "Non ho sentito niente.", "used": "", "ok": False,
+                    "terms": [], "choices": []}
         primary = None
         for alt in alts:
             speech = self.handle(alt, source)
@@ -95,11 +102,26 @@ class Router:
                 primary = (speech, alt, ok)
             if ok:
                 return {"speech": speech, "used": alt, "ok": True,
-                        "terms": list(getattr(speech, "terms", []))}
+                        "terms": list(getattr(speech, "terms", [])),
+                        "choices": self._choices()}
         return {"speech": primary[0], "used": primary[1], "ok": primary[2],
-                "terms": list(getattr(primary[0], "terms", []))}
+                "terms": list(getattr(primary[0], "terms", [])),
+                "choices": self._choices()}
+
+    def _choices(self) -> list:
+        """Tappable numbered choices for the web app, but only for a reply that
+        just opened a list; ``[]`` otherwise. Reuses ``actions._label`` so the
+        button text matches the spoken '1: Title di Artist' read-out."""
+        if not self._opened or not self.candidates:
+            return []
+        return [{"n": i + 1, "label": actions._label(c)}
+                for i, c in enumerate(self.candidates)]
 
     def handle(self, text: str, source: str = "tidal") -> str:
+        # Reset per turn; _remember/_played set it when this turn opens a list.
+        # A bare 'metti la N' pick doesn't re-open one, so its reply carries no
+        # buttons (the list was already shown on the previous reply).
+        self._opened = False
         t = (text or "").strip()
         if not t:
             return "Non ho sentito niente."

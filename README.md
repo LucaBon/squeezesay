@@ -31,14 +31,21 @@ question, never a silent wrong pick.
   confirms *"Riproduco Comfortably Numb di Pink Floyd."*
 - **"Did you mean" (top 3).** When several genuinely different songs match, it reads
   back the top three ("1: Love di X, 2: Love di Y") and you answer "metti la 2" — on
-  both the web app and Alexa. Exact matches just play; junk never wins.
+  both the web app and Alexa. On the **web app** those choices also appear as
+  **tappable buttons**, so you can just tap "2" instead of speaking. Exact matches just
+  play; junk never wins.
 - **Local library is scored too** — a generic word like "love" never plays an
   unrelated album, and "aerosmith" plays the *artist*, not a random album.
 - **Mishearing resilience.** The web app tries the browser's alternative
   transcriptions until one hits (English names it-IT often mangles).
-- **Natural multilingual read-back.** The reply is spoken with the Italian frame in an
-  Italian voice and the title/artist in *their* language (English/Spanish/French/German)
-  using the best natural voice your browser offers — pick voices in the app's settings.
+- **Hands-free wake word (web app).** Optionally arm a spoken keyword ("impianto" by
+  default) so you start a command without touching the screen — say «impianto metti Time».
+  Off by default; the mic otherwise stays tap-to-talk.
+- **Natural multilingual read-back — optional, off by default.** The on-screen transcript
+  already shows the reply, so the app is silent unless you tick "leggi la risposta ad alta
+  voce". When on, the Italian frame is spoken in an Italian voice and the title/artist in
+  *their* language (English/Spanish/French/German) using the best natural voice your
+  browser offers — pick voices in the app's settings.
 - **Optional kid-safe filter** (Alexa only) — a voice-editable blocklist gated by Alexa
   Voice ID.
 
@@ -81,7 +88,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # ~255 tests, no network — uses a simulated LMS transport
+uv run pytest        # ~257 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS+TIDAL (read-only, or `--play` to actually play):

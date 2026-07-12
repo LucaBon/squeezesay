@@ -31,6 +31,16 @@
   .vset { display: flex; flex-direction: column; gap: .35rem; margin: .3rem 0; }
   .vrow { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
   .vrow select { max-width: 62%; }
+  .opts { display: flex; flex-direction: column; gap: .45rem; width: 100%;
+          max-width: 480px; align-items: flex-start; }
+  .opts input[type=text] { padding: .3rem .4rem; font-size: .9rem; border-radius: .4rem;
+          border: 1px solid #8888; }
+  .choices { display: flex; flex-wrap: wrap; gap: .35rem; max-width: 480px;
+             align-self: flex-start; margin: -.1rem 0 .2rem; }
+  .choice { padding: .4rem .6rem; border-radius: .6rem; cursor: pointer;
+            border: 1px solid #2d7d46; background: #2d7d4622; color: inherit;
+            font-size: .9rem; }
+  .choice:active { transform: scale(.97); }
 </style>
 </head>
 <body>
@@ -43,12 +53,20 @@
     <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off">
     <button class="send" id="send">Invia</button>
   </div>
-  <label class="hint"><input type="checkbox" id="autosend"> invia subito dopo il microfono (mani libere)</label>
-  <details class="hint" style="max-width:480px">
-    <summary>🔊 Voci &amp; lingue</summary>
-    <div id="voiceSettings" class="vset"></div>
-    <label class="vrow">Lingua che parlo al microfono
+  <div class="opts">
+    <label class="hint"><input type="checkbox" id="autosend"> invia subito dopo il microfono (mani libere)</label>
+    <label class="vrow hint" style="width:100%">Lingua che parlo al microfono
       <select id="reclang"></select></label>
+    <label class="hint"><input type="checkbox" id="wakemode"> attiva a voce con una parola chiave
+      <input id="wakeword" type="text" value="impianto" autocomplete="off"></label>
+    <div id="wakehint" class="hint" style="display:none; text-align:left">Ascolto continuo: il microfono
+      resta attivo e l'audio passa dal riconoscimento vocale del browser. Poi tocca il microfono una
+      volta e di' «<b><span id="wwlabel">impianto</span></b> …» seguito dal comando.</div>
+    <label class="hint"><input type="checkbox" id="readback"> 🔊 leggi la risposta ad alta voce</label>
+  </div>
+  <details class="hint" id="voicepanel" style="max-width:480px; display:none">
+    <summary>Voci &amp; lingue</summary>
+    <div id="voiceSettings" class="vset"></div>
     <label class="vrow">Lingua predefinita dei titoli stranieri
       <select id="foreign"></select></label>
     <button class="send" id="testvoice" type="button" style="margin-top:.4rem">Prova le voci</button>
@@ -91,6 +109,23 @@ function bubble(text, who) {
   d.className = "bubble " + who;
   d.textContent = text;
   log.prepend(d);
+  return d;
+}
+
+// Render the server's numbered "did you mean" list as tappable buttons just
+// under its reply bubble, so on the web app you tap instead of re-speaking
+// "metti la 2". The pick reuses the server-side candidate list.
+function renderChoices(afterEl, choices) {
+  const row = document.createElement("div");
+  row.className = "choices";
+  choices.forEach(c => {
+    const btn = document.createElement("button");
+    btn.className = "choice";
+    btn.textContent = c.n + " · " + c.label;
+    btn.onclick = () => send("metti la " + c.n);
+    row.appendChild(btn);
+  });
+  afterEl.after(row);
 }
 
 // --- Multilingual voice manager (natural browser voices) ---
@@ -232,6 +267,29 @@ if (tv) tv.onclick = () => {
   for (const lang of Object.keys(samples)) utter(samples[lang], lang);
 };
 
+// --- read-back toggle (silent by default): the reply is spoken only when on,
+// and the voice/language panel is shown only then (it configures nothing else). ---
+const readbackOn = () => $("readback").checked;
+function syncVoicePanel() {
+  $("voicepanel").style.display = readbackOn() ? "" : "none";
+}
+$("readback").checked = localStorage.getItem("readback") === "1";
+$("readback").onchange = () => {
+  localStorage.setItem("readback", readbackOn() ? "1" : "0");
+  if (!readbackOn()) { try { speechSynthesis.cancel(); } catch (e) {} }
+  syncVoicePanel();
+};
+syncVoicePanel();
+
+// --- wake-word field (used by the recogniser below) ---
+const wakeWord = () => ($("wakeword").value || "impianto").trim();
+$("wakeword").value = localStorage.getItem("wakeword") || "impianto";
+$("wwlabel").textContent = wakeWord();
+$("wakeword").oninput = () => {
+  localStorage.setItem("wakeword", $("wakeword").value);
+  $("wwlabel").textContent = wakeWord();
+};
+
 async function send(text, alternatives) {
   text = (text || "").trim();
   if (!text) return;
@@ -250,8 +308,9 @@ async function send(text, alternatives) {
     if (data.used && data.used.trim() && data.used.trim() !== text) {
       $("text").value = data.used;
     }
-    bubble(data.speech, data.ok === false ? "sys warn" : "sys");
-    speak(data.speech, data.terms);
+    const b = bubble(data.speech, data.ok === false ? "sys warn" : "sys");
+    if (Array.isArray(data.choices) && data.choices.length) renderChoices(b, data.choices);
+    if (readbackOn()) speak(data.speech, data.terms);
   } catch (e) {
     bubble("Errore di rete verso il server locale.", "sys warn");
   }
@@ -274,28 +333,125 @@ if (!SR) {
     ' dispositivo. Avvia il server con un certificato (vedi README) oppure usa la casella di testo.</span>';
 } else {
   const rec = new SR();
-  rec.interimResults = false;
   rec.maxAlternatives = 5;  // hands-free: the server tries these in order
-  let listening = false;
-  mic.onclick = () => {
-    if (listening) { rec.stop(); return; }
+  rec.interimResults = true;  // show words live while speaking
+
+  // mode: "off" (idle) | "manual" (one tap-to-talk shot) | "wake" (continuous,
+  // listening for the wake word). `active` mirrors whether the recogniser runs.
+  let mode = "off", active = false, armed = false;
+  const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  // A short, self-contained "listening" cue for hands-free wake (no asset/CDN).
+  function beep() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.18);
+      o.start(); o.stop(ac.currentTime + 0.2);
+    } catch (e) { /* audio optional */ }
+  }
+
+  function configure(continuous) {
+    rec.continuous = continuous;
     rec.lang = (LANGS[recLang()] || LANGS.it).tag;  // match the language I'll speak
-    rec.start();
-  };
-  rec.onstart = () => { listening = true; mic.classList.add("listening"); statusEl.textContent = "Ascolto…"; };
-  rec.onend = () => { listening = false; mic.classList.remove("listening"); statusEl.textContent = "Tocca il microfono e parla."; };
-  rec.onerror = (e) => { statusEl.textContent = "Errore microfono: " + e.error; };
-  rec.onresult = (e) => {
-    const alts = Array.from(e.results[0], (a) => a.transcript);
-    const txt = alts[0];
-    $("text").value = txt;
-    if ($("autosend").checked) {
-      send(txt, alts);
-      $("text").value = "";
-    } else {
-      statusEl.textContent = "Controlla il testo (occhio ai nomi inglesi) e premi Invia.";
-      $("text").focus();
+  }
+  function startManual() {
+    if (active) { rec.stop(); return; }  // second tap stops
+    mode = "manual"; armed = false; configure(false);
+    try { rec.start(); } catch (e) {}
+  }
+  function startWake() {
+    mode = "wake"; armed = false; configure(true);
+    try { rec.start(); } catch (e) {}
+  }
+  function stopAll() { mode = "off"; try { rec.stop(); } catch (e) {} }
+
+  // The command is the words AFTER the wake phrase; returns null if the wake
+  // phrase isn't present (as whole words, accent/case-insensitive).
+  function commandAfterWake(text) {
+    const ww = norm(wakeWord()).split(/\s+/).filter(Boolean);
+    if (!ww.length) return null;
+    const words = (text || "").trim().split(/\s+/);
+    const nw = words.map(norm);
+    for (let i = 0; i + ww.length <= nw.length; i++) {
+      let hit = true;
+      for (let j = 0; j < ww.length; j++) if (nw[i + j] !== ww[j]) { hit = false; break; }
+      if (hit) return words.slice(i + ww.length).join(" ");
     }
+    return null;
+  }
+
+  function runCommand(txt, alts) {
+    $("text").value = txt;
+    send(txt, alts);
+    $("text").value = "";
+  }
+  function handleManualFinal(txt, alts) {
+    $("text").value = txt;
+    if ($("autosend").checked) { runCommand(txt, alts); }
+    else { statusEl.textContent = "Controlla il testo (occhio ai nomi inglesi) e premi Invia."; $("text").focus(); }
+  }
+  function handleWakeFinal(txt, alts) {
+    if (armed) { armed = false; beep(); runCommand(txt, alts); return; }
+    const after = commandAfterWake(txt);
+    if (after === null) return;  // just background chatter, ignore
+    beep();
+    if (after.trim()) {
+      const sAlts = (alts || []).map(commandAfterWake).filter(x => x && x.trim());
+      runCommand(after.trim(), sAlts.length ? sAlts : [after.trim()]);
+    } else { armed = true; statusEl.textContent = "Sì? Dimmi il comando…"; }
+  }
+
+  mic.onclick = () => {
+    if ($("wakemode").checked) { if (active) stopAll(); else startWake(); }
+    else startManual();
+  };
+  rec.onstart = () => {
+    active = true; mic.classList.add("listening");
+    statusEl.textContent = mode === "wake" ? ("In ascolto… di' «" + wakeWord() + " …»") : "Ascolto…";
+  };
+  rec.onend = () => {
+    active = false; mic.classList.remove("listening");
+    if (mode === "wake") {  // keep listening (mobile/Chrome auto-stop after a pause)
+      setTimeout(() => { if (mode === "wake" && !active) { try { rec.start(); } catch (e) {} } }, 350);
+    } else { mode = "off"; statusEl.textContent = "Tocca il microfono e parla."; }
+  };
+  rec.onerror = (e) => {
+    statusEl.textContent = "Errore microfono: " + e.error;
+    // A denied/blocked mic would otherwise restart-loop in wake mode: turn it off.
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      mode = "off"; $("wakemode").checked = false; $("wakehint").style.display = "none";
+    }
+  };
+  rec.onresult = (e) => {
+    let finalTxt = "", finalAlts = null, interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) { finalTxt = r[0].transcript; finalAlts = Array.from(r, (a) => a.transcript); }
+      else interim += r[0].transcript;
+    }
+    if (interim && !finalTxt) {  // live feedback while speaking
+      if (mode === "manual") $("text").value = interim;
+      else statusEl.textContent = "…" + interim;
+      return;
+    }
+    if (!finalTxt) return;
+    if (mode === "wake") handleWakeFinal(finalTxt, finalAlts);
+    else handleManualFinal(finalTxt, finalAlts);
+  };
+
+  // Restore the wake-mode toggle (needs a tap to actually start: browsers require
+  // a user gesture to open the mic).
+  $("wakemode").checked = localStorage.getItem("wakemode") === "1";
+  $("wakehint").style.display = $("wakemode").checked ? "" : "none";
+  $("wakemode").onchange = () => {
+    const on = $("wakemode").checked;
+    localStorage.setItem("wakemode", on ? "1" : "0");
+    $("wakehint").style.display = on ? "" : "none";
+    if (on) startWake(); else stopAll();
   };
 }
 </script>

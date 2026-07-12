@@ -51,8 +51,13 @@ The **text box works everywhere**, even over HTTP.
 2. Open **Chrome/Edge** at `https://<this-pc-ip>:8730`.
 3. First time: "connection not private" (self-signed cert) → **Advanced → Proceed**, once.
 4. Tap the **mic**, allow the permission, speak in Italian — or use the text box. The
-   reply is also read aloud. Tip: **Add to Home Screen** to use it like an app.
-5. Open the app's **🔊 Voci & lingue** panel to pick natural per-language voices.
+   reply shows on screen (silent by default). Tip: **Add to Home Screen** to use it like
+   an app. When the reply offers a numbered list, its choices appear as **tappable
+   buttons** — tap instead of saying "metti la 2".
+5. Optional, hands-free: tick **"attiva a voce con una parola chiave"** and start commands
+   with the wake word ("impianto" by default) — «impianto metti Time».
+6. Want the reply read aloud too? Tick **"🔊 leggi la risposta ad alta voce"**; the
+   **Voci & lingue** panel then lets you pick natural per-language voices.
 
 ---
 
