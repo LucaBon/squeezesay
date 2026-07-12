@@ -61,7 +61,11 @@
       <input id="wakeword" type="text" value="impianto" autocomplete="off"></label>
     <div id="wakehint" class="hint" style="display:none; text-align:left">Ascolto continuo: il microfono
       resta attivo e l'audio passa dal riconoscimento vocale del browser. Poi tocca il microfono una
-      volta e di' «<b><span id="wwlabel">impianto</span></b> …» seguito dal comando.</div>
+      volta e di' «<b><span id="wwlabel">impianto</span></b> …» seguito dal comando.
+      <span class="warn">Su Android il browser emette un suono a ogni riattivazione dell'ascolto
+      (ogni pochi secondi), e non si può togliere da qui: sul telefono conviene lasciare questa
+      opzione spenta e usare il microfono a tocco (un suono solo per comando). La parola chiave dà
+      il meglio su PC/tablet con Chrome.</span></div>
     <label class="hint"><input type="checkbox" id="readback"> 🔊 leggi la risposta ad alta voce</label>
   </div>
   <details class="hint" id="voicepanel" style="max-width:480px; display:none">
