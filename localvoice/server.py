@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import ssl
 import sys
 import threading
@@ -33,6 +34,31 @@ from lms import LMSClient  # noqa: E402
 from router import Router  # noqa: E402
 
 INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
+
+
+def lan_ips() -> list:
+    """This machine's LAN IPv4 addresses, the default-route one first.
+
+    Best-effort: used only to print a ready-to-open URL, never to bind.
+    """
+    ips: list = []
+    # The address the OS would use to reach the outside = the LAN IP the phone
+    # should target. No packet is actually sent (UDP connect just picks a route).
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ips.append(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except OSError:
+        pass
+    return ips
 
 
 def make_handler(lms, material_url: str):
@@ -146,8 +172,17 @@ def main() -> int:
         httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
         scheme = "https"
 
-    print(f"Pronto: {scheme}://<ip-di-questo-pc>:{args.port}   (LMS {lms_url})")
-    print("Ctrl+C per fermare.")
+    # Print the real address to open, not a placeholder. If --host pins a
+    # specific interface, show that; otherwise (0.0.0.0) list this PC's LAN IPs.
+    if args.host not in ("0.0.0.0", "", "::"):
+        hosts = [args.host]
+    else:
+        hosts = lan_ips() or ["<ip-di-questo-pc>"]
+    print(f"Pronto: {scheme}://{hosts[0]}:{args.port}   (LMS {lms_url})")
+    for extra in hosts[1:]:
+        print(f"        {scheme}://{extra}:{args.port}")
+    print("Apri l'indirizzo qui sopra dal telefono/PC sulla stessa rete. "
+          "Ctrl+C per fermare.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
