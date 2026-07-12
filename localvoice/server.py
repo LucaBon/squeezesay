@@ -37,28 +37,30 @@ INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
 
 
 def lan_ips() -> list:
-    """This machine's LAN IPv4 addresses, the default-route one first.
+    """This machine's primary LAN IPv4, for printing a ready-to-open URL.
 
-    Best-effort: used only to print a ready-to-open URL, never to bind.
+    Best-effort, used only for display (never to bind). Uses the default-route
+    address — the one a phone on the same LAN should target — which naturally
+    skips virtual adapters (WSL/Hyper-V vEthernet). No packet is actually sent;
+    the UDP connect just makes the OS pick the outgoing route. Falls back to a
+    non-loopback hostname address only if the route probe fails.
     """
-    ips: list = []
-    # The address the OS would use to reach the outside = the LAN IP the phone
-    # should target. No packet is actually sent (UDP connect just picks a route).
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
-        ips.append(s.getsockname()[0])
+        ip = s.getsockname()[0]
         s.close()
+        return [ip]
     except OSError:
         pass
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             ip = info[4][0]
-            if ip not in ips and not ip.startswith("127."):
-                ips.append(ip)
+            if not ip.startswith("127."):
+                return [ip]
     except OSError:
         pass
-    return ips
+    return []
 
 
 def make_handler(lms, material_url: str):
@@ -173,7 +175,7 @@ def main() -> int:
         scheme = "https"
 
     # Print the real address to open, not a placeholder. If --host pins a
-    # specific interface, show that; otherwise (0.0.0.0) list this PC's LAN IPs.
+    # specific interface, show that; otherwise (0.0.0.0) show this PC's LAN IP.
     if args.host not in ("0.0.0.0", "", "::"):
         hosts = [args.host]
     else:
@@ -181,8 +183,20 @@ def main() -> int:
     print(f"Pronto: {scheme}://{hosts[0]}:{args.port}   (LMS {lms_url})")
     for extra in hosts[1:]:
         print(f"        {scheme}://{extra}:{args.port}")
-    print("Apri l'indirizzo qui sopra dal telefono/PC sulla stessa rete. "
-          "Ctrl+C per fermare.")
+    print("Apri l'indirizzo qui sopra dal telefono/PC sulla stessa rete.")
+    if scheme == "http":
+        # Web Speech (il microfono) richiede un contesto sicuro: da un altro
+        # device serve HTTPS. La casella di testo invece funziona anche in HTTP.
+        print("Nota: in HTTP il microfono funziona solo su questo PC (localhost); "
+              "la casella di testo funziona ovunque.")
+        print("      Per il microfono dal telefono serve HTTPS con certificato:")
+        print("        uv run python tools/make_cert.py")
+        print(f"        uv run python localvoice/server.py --lms {lms_url} "
+              "--cert cert.pem --key key.pem")
+    else:
+        print("Microfono disponibile anche dal telefono (HTTPS). Al primo accesso "
+              "accetta una volta l'avviso del certificato self-signed.")
+    print("Ctrl+C per fermare.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
