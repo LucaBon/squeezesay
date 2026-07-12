@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impianto — voce locale</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 1.2rem;
+         display: flex; flex-direction: column; gap: 1rem; align-items: center;
+         min-height: 100vh; box-sizing: border-box; }
+  h1 { font-size: 1.2rem; margin: .3rem 0; }
+  #mic { width: 160px; height: 160px; border-radius: 50%; border: none;
+         font-size: 3rem; cursor: pointer; background: #2d7d46; color: #fff;
+         transition: transform .1s, background .2s; }
+  #mic:active { transform: scale(.96); }
+  #mic.listening { background: #c0392b; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(192,57,43,.5) }
+                     50%{ box-shadow:0 0 0 18px rgba(192,57,43,0) } }
+  .row { display: flex; gap: .5rem; width: 100%; max-width: 480px; }
+  input { flex: 1; padding: .7rem; font-size: 1rem; border-radius: .5rem;
+          border: 1px solid #8888; }
+  button.send { padding: .7rem 1rem; font-size: 1rem; border-radius: .5rem;
+                border: none; background: #2d7d46; color: #fff; cursor: pointer; }
+  #log { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: .4rem; }
+  .bubble { padding: .6rem .8rem; border-radius: .8rem; max-width: 85%; }
+  .you { align-self: flex-end; background: #2d7d4633; }
+  .sys { align-self: flex-start; background: #8881; }
+  .hint { opacity: .7; font-size: .85rem; text-align: center; max-width: 480px; }
+  .warn { color: #c0392b; }
+  .vset { display: flex; flex-direction: column; gap: .35rem; margin: .3rem 0; }
+  .vrow { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+  .vrow select { max-width: 62%; }
+</style>
+</head>
+<body>
+  <h1>🎵 Impianto — comando vocale locale</h1>
+  <button id="mic" title="Tieni premuto o clicca e parla">🎙️</button>
+  <div id="status" class="hint">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
+  <div class="hint">Cerca da solo nella <b>tua libreria</b> e su <b>TIDAL</b>.
+    Per forzare la sorgente: «<i>dalla mia musica</i> …» oppure «<i>da tidal</i> …».</div>
+  <div class="row">
+    <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off">
+    <button class="send" id="send">Invia</button>
+  </div>
+  <label class="hint"><input type="checkbox" id="autosend"> invia subito dopo il microfono (mani libere)</label>
+  <details class="hint" style="max-width:480px">
+    <summary>🔊 Voci &amp; lingue</summary>
+    <div id="voiceSettings" class="vset"></div>
+    <label class="vrow">Lingua che parlo al microfono
+      <select id="reclang"></select></label>
+    <label class="vrow">Lingua predefinita dei titoli stranieri
+      <select id="foreign"></select></label>
+    <button class="send" id="testvoice" type="button" style="margin-top:.4rem">Prova le voci</button>
+    <div class="hint" style="margin-top:.3rem">La cornice italiana («Riproduco…») è letta in italiano;
+      il titolo e l'artista nella loro lingua. Le voci disponibili dipendono dal dispositivo.</div>
+  </details>
+  <div id="log"></div>
+  <details class="hint" style="max-width:480px">
+    <summary>Cosa posso dire</summary>
+    <ul style="text-align:left; padding-left:1.2rem; margin:.4rem 0">
+      <li>«riproduci Comfortably Numb dei Pink Floyd»</li>
+      <li>«metti l'album The Wall» · «metti la musica di Aerosmith»</li>
+      <li>«quali album ho di Yes» → «metti la 2» (o «metti Fragile»)</li>
+      <li>«dalla mia musica metti …» · «da tidal metti …»</li>
+      <li>«pausa» · «riprendi» · «prossima» · «alza il volume» · «cosa sta suonando»</li>
+    </ul>
+  </details>
+  <div class="hint">Suggerimento: se un <b>nome inglese</b> viene capito male (es. «Audioslave» →
+    «audio slave»), correggilo nella casella e premi Invia.</div>
+  <a class="hint" id="material" href="__MATERIAL_URL__" target="_blank" rel="noopener">
+    Vuoi vedere coda, copertine e sfogliare? Apri Material Skin ↗</a>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const log = $("log"), statusEl = $("status");
+
+// Stable per-browser id so this device's "metti la N" list stays its own on the
+// server (two phones don't clobber each other).
+function clientId() {
+  let id = localStorage.getItem("impianto_client");
+  if (!id) {
+    id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem("impianto_client", id);
+  }
+  return id;
+}
+
+function bubble(text, who) {
+  const d = document.createElement("div");
+  d.className = "bubble " + who;
+  d.textContent = text;
+  log.prepend(d);
+}
+
+// --- Multilingual voice manager (natural browser voices) ---
+const LANGS = {
+  it: { name: "Italiano", tag: "it-IT" },
+  en: { name: "English",  tag: "en-US" },
+  es: { name: "Español",  tag: "es-ES" },
+  fr: { name: "Français", tag: "fr-FR" },
+  de: { name: "Deutsch",  tag: "de-DE" },
+};
+const NATURAL = /natural|neural|online|google|siri|premium|enhanced/i;
+let VOICES = [];
+
+function voicesFor(lang) {
+  return VOICES.filter(v => (v.lang || "").toLowerCase().startsWith(lang));
+}
+function pickDefaultVoice(lang) {
+  const cand = voicesFor(lang);
+  return cand.find(v => NATURAL.test(v.name)) || cand[0] || null;
+}
+function chosenVoice(lang) {
+  const saved = localStorage.getItem("voice_" + lang);
+  if (saved) {
+    const v = VOICES.find(x => x.name === saved && (x.lang || "").toLowerCase().startsWith(lang));
+    if (v) return v;
+  }
+  return pickDefaultVoice(lang);
+}
+const recLang = () => localStorage.getItem("reclang") || "it";
+const foreignDefault = () => localStorage.getItem("foreign_default") || "en";
+
+// Guess a term's language; proper nouns usually have no signal -> foreign default.
+function detectLang(text) {
+  const s = (text || "").toLowerCase();
+  if (/[ñ]|¡|¿/.test(s)) return "es";
+  if (/ß|[äöü]/.test(s)) return "de";
+  if (/[çœâêëîïôû]/.test(s)) return "fr";
+  const w = new Set(s.split(/\s+/));
+  const any = (arr) => arr.some(x => w.has(x));
+  if (any(["der","die","das","und","ich","nicht","ein","mit","für"])) return "de";
+  if (any(["le","les","une","des","et","dans","pour","avec","je"])) return "fr";
+  if (any(["el","los","las","una","con","por","para","que"])) return "es";
+  if (any(["gli","che","della","dei","degli","nella","alla"])) return "it";
+  return foreignDefault();
+}
+
+// Split the reply into the Italian frame vs the foreign terms (in order), so each
+// part is spoken by the right-language voice.
+function splitByTerms(speech, terms) {
+  const marks = [];
+  let from = 0;
+  (terms || []).forEach(term => {
+    if (!term) return;
+    const pos = speech.toLowerCase().indexOf(String(term).toLowerCase(), from);
+    if (pos >= 0) { marks.push([pos, pos + term.length, detectLang(term)]); from = pos + term.length; }
+  });
+  if (!marks.length) return [{ text: speech, lang: "it" }];
+  const segs = [];
+  let cur = 0;
+  marks.forEach(([start, end, lang]) => {
+    if (start > cur) segs.push({ text: speech.slice(cur, start), lang: "it" });
+    segs.push({ text: speech.slice(start, end), lang });
+    cur = end;
+  });
+  if (cur < speech.length) segs.push({ text: speech.slice(cur), lang: "it" });
+  return segs;
+}
+
+function utter(text, lang) {
+  const u = new SpeechSynthesisUtterance(text);
+  const v = chosenVoice(lang);
+  if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = (LANGS[lang] || LANGS.it).tag; }
+  speechSynthesis.speak(u);
+}
+
+function speak(text, terms) {
+  try {
+    speechSynthesis.cancel();
+    for (const seg of splitByTerms(text, terms)) {
+      if (seg.text.trim()) utter(seg.text, seg.lang);
+    }
+  } catch (e) { /* TTS optional */ }
+}
+
+// --- voice settings UI ---
+function buildVoicePickers() {
+  const box = $("voiceSettings");
+  if (!box) return;
+  box.innerHTML = "";
+  for (const lang of Object.keys(LANGS)) {
+    const row = document.createElement("label");
+    row.className = "vrow";
+    row.append(LANGS[lang].name + " ");
+    const sel = document.createElement("select");
+    const vs = voicesFor(lang);
+    if (!vs.length) {
+      sel.innerHTML = "<option>(nessuna voce)</option>";
+      sel.disabled = true;
+    } else {
+      const cur = (chosenVoice(lang) || {}).name;
+      for (const v of vs) {
+        const o = document.createElement("option");
+        o.value = v.name;
+        o.textContent = v.name + (NATURAL.test(v.name) ? " ⭐" : "");
+        if (v.name === cur) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.onchange = () => localStorage.setItem("voice_" + lang, sel.value);
+    }
+    row.appendChild(sel);
+    box.appendChild(row);
+  }
+  const opts = Object.keys(LANGS).map(l => `<option value="${l}">${LANGS[l].name}</option>`).join("");
+  const rl = $("reclang"), fd = $("foreign");
+  if (rl && !rl.dataset.done) {
+    rl.innerHTML = opts; rl.value = recLang(); rl.dataset.done = "1";
+    rl.onchange = () => localStorage.setItem("reclang", rl.value);
+  }
+  if (fd && !fd.dataset.done) {
+    // foreign default excludes Italian (the frame is always Italian)
+    fd.innerHTML = Object.keys(LANGS).filter(l => l !== "it")
+      .map(l => `<option value="${l}">${LANGS[l].name}</option>`).join("");
+    fd.value = foreignDefault(); fd.dataset.done = "1";
+    fd.onchange = () => localStorage.setItem("foreign_default", fd.value);
+  }
+}
+
+function loadVoices() { VOICES = speechSynthesis.getVoices() || []; buildVoicePickers(); }
+if ("speechSynthesis" in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+document.addEventListener("DOMContentLoaded", buildVoicePickers);
+const tv = $("testvoice");
+if (tv) tv.onclick = () => {
+  speechSynthesis.cancel();
+  const samples = { it: "Ciao, voce italiana.", en: "Hello, English voice.",
+    es: "Hola, voz española.", fr: "Bonjour, voix française.", de: "Hallo, deutsche Stimme." };
+  for (const lang of Object.keys(samples)) utter(samples[lang], lang);
+};
+
+async function send(text, alternatives) {
+  text = (text || "").trim();
+  if (!text) return;
+  bubble(text, "you");
+  const body = { text, client: clientId() };
+  if (alternatives && alternatives.length > 1) body.alternatives = alternatives;
+  try {
+    const r = await fetch("/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    // If the server kept a different alternative than what we heard first,
+    // show it in the box so the next correction starts from what worked.
+    if (data.used && data.used.trim() && data.used.trim() !== text) {
+      $("text").value = data.used;
+    }
+    bubble(data.speech, data.ok === false ? "sys warn" : "sys");
+    speak(data.speech, data.terms);
+  } catch (e) {
+    bubble("Errore di rete verso il server locale.", "sys warn");
+  }
+}
+
+$("send").onclick = () => { send($("text").value); $("text").value = ""; };
+$("text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { send($("text").value); $("text").value = ""; }
+});
+
+// --- Speech recognition (Web Speech API) ---
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = $("mic");
+if (!SR) {
+  statusEl.innerHTML = '<span class="warn">Questo browser non supporta il microfono.' +
+    ' Usa la casella di testo, oppure apri con Chrome/Edge.</span>';
+} else if (!window.isSecureContext && location.hostname !== "localhost"
+           && location.hostname !== "127.0.0.1") {
+  statusEl.innerHTML = '<span class="warn">Il microfono richiede HTTPS quando apri da un altro' +
+    ' dispositivo. Avvia il server con un certificato (vedi README) oppure usa la casella di testo.</span>';
+} else {
+  const rec = new SR();
+  rec.interimResults = false;
+  rec.maxAlternatives = 5;  // hands-free: the server tries these in order
+  let listening = false;
+  mic.onclick = () => {
+    if (listening) { rec.stop(); return; }
+    rec.lang = (LANGS[recLang()] || LANGS.it).tag;  // match the language I'll speak
+    rec.start();
+  };
+  rec.onstart = () => { listening = true; mic.classList.add("listening"); statusEl.textContent = "Ascolto…"; };
+  rec.onend = () => { listening = false; mic.classList.remove("listening"); statusEl.textContent = "Tocca il microfono e parla."; };
+  rec.onerror = (e) => { statusEl.textContent = "Errore microfono: " + e.error; };
+  rec.onresult = (e) => {
+    const alts = Array.from(e.results[0], (a) => a.transcript);
+    const txt = alts[0];
+    $("text").value = txt;
+    if ($("autosend").checked) {
+      send(txt, alts);
+      $("text").value = "";
+    } else {
+      statusEl.textContent = "Controlla il testo (occhio ai nomi inglesi) e premi Invia.";
+      $("text").focus();
+    }
+  };
+}
+</script>
+</body>
+</html>

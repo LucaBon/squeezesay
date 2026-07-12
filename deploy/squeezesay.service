@@ -1,0 +1,22 @@
+# systemd unit for an always-on Linux host (e.g. Raspberry Pi / mini-PC).
+# Install:
+#   sudo cp deploy/squeezesay.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now squeezesay
+# Adapt WorkingDirectory and the venv python path to your setup. The LMS server is
+# auto-discovered on the LAN; add `--lms http://IP:9000` to ExecStart to pin it.
+[Unit]
+Description=SqueezeSay — local voice server for Daphile/LMS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/squeezesay
+ExecStart=/opt/squeezesay/.venv/bin/python localvoice/server.py \
+    --cert /opt/squeezesay/cert.pem --key /opt/squeezesay/key.pem
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

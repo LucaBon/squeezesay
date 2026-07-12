@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Build artifacts
+skill.zip
+build/
+lambda/ask_sdk*/
+lambda/certifi/
+lambda/*.dist-info/
+
+# TLS certs for the local server
+*.pem
+
+# Local config / secrets
+*.env
+!config.example.env
+lambda/config.py
+config.py
