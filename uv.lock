@@ -499,7 +499,7 @@ wheels = [
 ]
 
 [[package]]
-name = "daphile-alexa"
+name = "squeezesay"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
