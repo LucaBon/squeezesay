@@ -19,6 +19,9 @@ from blocklist_store import BlocklistStoreError
 from lms import LMSError
 from messages import msg
 
+# Legacy alias, frozen in the default language at import: kept for external
+# callers/tests; the code paths below call msg() so replies follow the
+# per-request language.
 ERR_UNREACHABLE = msg("err_unreachable")
 VOLUME_STEP = 5
 LIST_LIMIT = 5
@@ -152,7 +155,7 @@ def _did_you_mean(query: Optional[str], cands: List[Dict]) -> ActionResult:
 
 def _play_tidal_track(lms, track: Dict, fallback_title: Optional[str], *, guard: Optional[Guard] = None) -> ActionResult:
     if guard and guard.blocks(track.get("title")):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     lms.play_url(track["url"])
     speech, terms = _confirm_song(lms, track, fallback_title)
     return ActionResult(speech, ok=True, terms=terms)
@@ -265,7 +268,7 @@ def play_song(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> Ac
     if not title and not album:
         return ActionResult(msg("ask_title"), ok=False)
     if guard and guard.blocks(title, artist, album):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     try:
         if album:
             return _play_from_album(lms, title, album, guard=guard)
@@ -277,7 +280,7 @@ def play_song(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> Ac
             return ActionResult(msg("no_track_found", title=title), ok=False)
         return _resolve_song(lms, tracks, title, artist, guard=guard)
     except LMSError:
-        return ActionResult(ERR_UNREACHABLE, ok=False)
+        return ActionResult(msg("err_unreachable"), ok=False)
 
 
 def _resolve_song(lms, tracks, title, artist, *, guard=None) -> ActionResult:
@@ -338,13 +341,13 @@ def _play_from_album(
         return ActionResult(msg("album_not_found", album=album), ok=False)
     album_name = result["album"]["title"] or album
     if guard and guard.blocks(album_name):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     if title:
         ranked = _rank(title, result["tracks"])
         if ranked and ranked[0][0] >= CONFIDENT_SCORE:
             track = ranked[0][1]
             if guard and guard.blocks(track.get("title")):
-                return ActionResult(BLOCKED_SPEECH, ok=False)
+                return ActionResult(msg("blocked"), ok=False)
             lms.play_url(track["url"])
             return ActionResult(
                 msg("playing_track_from_album", title=track["title"], album=album_name),
@@ -367,17 +370,17 @@ def play_album(lms, album: Optional[str], *, guard: Optional[Guard] = None) -> A
     if not album:
         return ActionResult(msg("ask_album"), ok=False)
     if guard and guard.blocks(album):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     try:
         cands = lms.album_candidates(album)
         if not cands:
             return ActionResult(msg("album_not_found", album=album), ok=False)
         item = _rank(album, cands)[0][1]  # best title match, not blindly the first
         if guard and guard.blocks(item.get("title")):
-            return ActionResult(BLOCKED_SPEECH, ok=False)
+            return ActionResult(msg("blocked"), ok=False)
         lms.play_browse_item(item["id"])
     except LMSError:
-        return ActionResult(ERR_UNREACHABLE, ok=False)
+        return ActionResult(msg("err_unreachable"), ok=False)
     name = item["title"] or album
     return ActionResult(msg("playing_album", album=name), ok=True, terms=[name])
 
@@ -387,19 +390,19 @@ def play_artist(lms, artist: Optional[str], *, guard: Optional[Guard] = None) ->
     if not artist:
         return ActionResult(msg("ask_artist"), ok=False)
     if guard and guard.blocks(artist):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     try:
         result = lms.artist_top_tracks(artist)
         if not result["artist"]:
             return ActionResult(msg("artist_not_found", artist=artist), ok=False)
         if guard and guard.blocks(result["artist"].get("title")):
-            return ActionResult(BLOCKED_SPEECH, ok=False)
+            return ActionResult(msg("blocked"), ok=False)
         tracks = result["tracks"]
         if not tracks:
             return ActionResult(msg("artist_unplayable", artist=artist), ok=False)
         lms.play_tracks([t["url"] for t in tracks])
     except LMSError:
-        return ActionResult(ERR_UNREACHABLE, ok=False)
+        return ActionResult(msg("err_unreachable"), ok=False)
     return ActionResult(msg("playing_artist", artist=artist), ok=True, terms=[artist])
 
 
@@ -408,17 +411,17 @@ def play_playlist(lms, name: Optional[str], *, guard: Optional[Guard] = None) ->
     if not name:
         return ActionResult(msg("ask_playlist"), ok=False)
     if guard and guard.blocks(name):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     try:
         cands = lms.playlist_candidates(name)
         if not cands:
             return ActionResult(msg("playlist_not_found", name=name), ok=False)
         item = _rank(name, cands)[0][1]
         if guard and guard.blocks(item.get("title")):
-            return ActionResult(BLOCKED_SPEECH, ok=False)
+            return ActionResult(msg("blocked"), ok=False)
         lms.play_browse_item(item["id"])
     except LMSError:
-        return ActionResult(ERR_UNREACHABLE, ok=False)
+        return ActionResult(msg("err_unreachable"), ok=False)
     return ActionResult(msg("playing_playlist", name=name), ok=True, terms=[name])
 
 
@@ -426,7 +429,7 @@ def pause(lms) -> str:
     try:
         lms.pause()
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("paused")
 
 
@@ -434,7 +437,7 @@ def resume(lms) -> str:
     try:
         lms.resume()
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("resumed")
 
 
@@ -442,7 +445,7 @@ def next_track(lms) -> str:
     try:
         lms.next_track()
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("next_track")
 
 
@@ -450,7 +453,7 @@ def previous_track(lms) -> str:
     try:
         lms.previous_track()
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("previous_track")
 
 
@@ -461,7 +464,7 @@ def change_volume(lms, direction: str) -> str:
     try:
         lms.volume(delta)
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("volume_up") if direction == "up" else msg("volume_down")
 
 
@@ -469,7 +472,7 @@ def now_playing(lms) -> str:
     try:
         info = lms.now_playing_info()
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     if not info or not info.get("title"):
         return ActionResult(msg("nothing_playing"), ok=True)
     title = info.get("title")
@@ -492,11 +495,11 @@ def top_tracks_list(
     if not artist:
         return {"speech": msg("which_artist"), "candidates": []}
     if guard and guard.blocks(artist):
-        return {"speech": BLOCKED_SPEECH, "candidates": []}
+        return {"speech": msg("blocked"), "candidates": []}
     try:
         tracks = lms.artist_top_tracks(artist)["tracks"]
     except LMSError:
-        return {"speech": ERR_UNREACHABLE, "candidates": []}
+        return {"speech": msg("err_unreachable"), "candidates": []}
     if guard and guard.restricted:  # drop blocked tracks so they can't be chosen
         tracks = [t for t in tracks if not is_blocked(t.get("title"), guard.blocklist)]
     tracks = tracks[:limit]
@@ -539,11 +542,11 @@ def choose_from(
         return msg("pick_range", n=len(candidates))
     chosen = candidates[number - 1]
     if guard and guard.blocks(chosen.get("title")):
-        return BLOCKED_SPEECH
+        return msg("blocked")
     try:
         _dispatch_play(lms, chosen)
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("playing", name=chosen["title"])
 
 
@@ -581,11 +584,11 @@ def choose_by_name(
     if chosen is None:
         return None
     if guard and guard.blocks(chosen.get("title")):
-        return BLOCKED_SPEECH
+        return msg("blocked")
     try:
         _dispatch_play(lms, chosen)
     except LMSError:
-        return ERR_UNREACHABLE
+        return msg("err_unreachable")
     return msg("playing", name=chosen["title"])
 
 
@@ -618,7 +621,7 @@ def play_local(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> A
     if not query:
         return ActionResult(msg("ask_query"), ok=False)
     if guard and guard.blocks(query):
-        return ActionResult(BLOCKED_SPEECH, ok=False)
+        return ActionResult(msg("blocked"), ok=False)
     try:
         groups = [
             g for g in (
@@ -643,7 +646,7 @@ def play_local(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> A
         )
         return ActionResult(speech, ok=True, terms=[item["title"]])
     except LMSError:
-        return ActionResult(ERR_UNREACHABLE, ok=False)
+        return ActionResult(msg("err_unreachable"), ok=False)
 
 
 def local_albums_list(
@@ -655,11 +658,11 @@ def local_albums_list(
     if not artist:
         return {"speech": msg("which_artist"), "candidates": []}
     if guard and guard.blocks(artist):
-        return {"speech": BLOCKED_SPEECH, "candidates": []}
+        return {"speech": msg("blocked"), "candidates": []}
     try:
         result = lms.local_albums_by_artist(artist)
     except LMSError:
-        return {"speech": ERR_UNREACHABLE, "candidates": []}
+        return {"speech": msg("err_unreachable"), "candidates": []}
     if not result["artist"]:
         return {"speech": msg("local_no_artist", artist=artist), "candidates": []}
     albums = result["albums"]
@@ -684,7 +687,7 @@ def local_albums_list(
 def add_block(store, term: Optional[str], *, is_owner: bool) -> str:
     """Add a song/singer term to the blocklist. Owner-gated."""
     if not is_owner:
-        return NOT_OWNER_SPEECH
+        return msg("not_owner")
     term = (term or "").strip()
     if not term:
         return msg("ask_block")
@@ -701,7 +704,7 @@ def add_block(store, term: Optional[str], *, is_owner: bool) -> str:
 def remove_block(store, term: Optional[str], *, is_owner: bool) -> str:
     """Remove a term from the blocklist. Owner-gated."""
     if not is_owner:
-        return NOT_OWNER_SPEECH
+        return msg("not_owner")
     term = (term or "").strip()
     if not term:
         return msg("ask_unblock")
@@ -719,7 +722,7 @@ def remove_block(store, term: Optional[str], *, is_owner: bool) -> str:
 def list_blocks(store, *, is_owner: bool) -> str:
     """Read the blocked terms aloud. Owner-gated."""
     if not is_owner:
-        return NOT_OWNER_SPEECH
+        return msg("not_owner")
     terms = store.get()
     if not terms:
         return msg("blocklist_empty")

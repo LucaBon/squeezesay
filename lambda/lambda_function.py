@@ -16,6 +16,7 @@ import os
 from ask_sdk_core.dispatch_components import (
     AbstractExceptionHandler,
     AbstractRequestHandler,
+    AbstractRequestInterceptor,
 )
 from ask_sdk_core.skill_builder import SkillBuilder
 from ask_sdk_core.utils import is_intent_name, is_request_type
@@ -23,7 +24,17 @@ from ask_sdk_core.utils import is_intent_name, is_request_type
 import actions
 import blocklist_store
 from lms import LMSClient
-from messages import msg
+from messages import msg, set_lang
+
+
+class LanguageInterceptor(AbstractRequestInterceptor):
+    """Reply in the language of the skill locale (en-* -> English, else
+    Italian). Runs before every handler, so actions and messages pick the
+    right catalog for this request."""
+
+    def process(self, handler_input):
+        locale = getattr(handler_input.request_envelope.request, "locale", "") or ""
+        set_lang("en" if str(locale).lower().startswith("en") else "it")
 
 
 # Config comes from environment variables (own-Lambda deploy) or, as a fallback,
@@ -392,6 +403,7 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
 
 
 sb = SkillBuilder()
+sb.add_global_request_interceptor(LanguageInterceptor())
 sb.add_request_handler(LaunchRequestHandler())
 sb.add_request_handler(PlaySongHandler())
 sb.add_request_handler(PlayArtistHandler())

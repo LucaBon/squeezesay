@@ -109,12 +109,127 @@ IT = {
     "alexa_error": "Si è verificato un problema con l'impianto. Riprova tra poco.",
 }
 
-CATALOGS = {"it": IT}
+EN = {
+    # -- shared errors / gates ---------------------------------------------
+    "err_unreachable":
+        "I can't reach the system right now. Please try again in a moment.",
+    "blocked":
+        "That song exists, but it's not suitable for your age, so I can't play it.",
+    "not_owner": "Only the parent can change the blocked-songs list.",
+
+    # -- labels / list read-outs -------------------------------------------
+    "generic_track": "track",
+    "label_title_artist": "{title} by {artist}",
+    "enum_item": "{n}: {name}",
+    "didyoumean": "I found several for {query}. {listing}. Which one should I play?",
+
+    # -- play (streaming) ----------------------------------------------------
+    "ask_title": "I didn't catch the title. Can you repeat?",
+    "no_track_found": "I couldn't find any track for {title}.",
+    "playing": "Playing {name}.",
+    "playing_by": "Playing {name} by {artist}.",
+    "album_not_found": "I couldn't find the album {album}.",
+    "playing_track_from_album": "Playing {title} from the album {album}.",
+    "track_not_in_album":
+        "I couldn't find {title} in the album {album}; playing the album.",
+    "playing_album": "Playing the album {album}.",
+    "ask_album": "I didn't catch which album. Can you repeat?",
+    "ask_artist": "I didn't catch the artist. Can you repeat?",
+    "artist_not_found": "I couldn't find the artist {artist}.",
+    "artist_unplayable": "I can't play the artist {artist}.",
+    "playing_artist": "Playing music by {artist}.",
+    "ask_playlist": "I didn't catch which playlist. Can you repeat?",
+    "playlist_not_found": "I couldn't find the playlist {name}.",
+    "playing_playlist": "Playing the playlist {name}.",
+
+    # -- transport / info ----------------------------------------------------
+    "paused": "Paused.",
+    "resumed": "Resuming playback.",
+    "next_track": "Next track.",
+    "previous_track": "Previous track.",
+    "volume_up": "Volume up.",
+    "volume_down": "Volume down.",
+    "nothing_playing": "Nothing is playing right now.",
+    "now_playing": "Now playing {title}.",
+    "now_playing_by": "Now playing {title} by {artist}.",
+
+    # -- lists -> numbered choice -------------------------------------------
+    "which_artist": "Which artist?",
+    "no_tracks_for": "I couldn't find tracks for {artist}.",
+    "top_tracks": "Here are the most played tracks by {artist}. {listing}. Which one should I play?",
+    "no_open_list":
+        "First ask me for a list, for example: which are the top tracks by Pink Floyd.",
+    "pick_range": "Pick a number from 1 to {n}.",
+
+    # -- local library --------------------------------------------------------
+    "ask_query": "I didn't catch what to play. Can you repeat?",
+    "local_not_found": "I couldn't find {query} in your music.",
+    "playing_local_album": "Playing the album {title} from your music.",
+    "playing_local": "Playing {title} from your music.",
+    "local_no_artist": "I don't have {artist} in your music.",
+    "local_no_albums": "I couldn't find albums by {artist}.",
+    "local_albums": "By {artist} I have: {listing}. Which one should I play?",
+
+    # -- kid-safe blocklist ---------------------------------------------------
+    "ask_block": "I didn't catch what to block. Can you repeat?",
+    "already_blocked": "{term} is already in the blocked-songs list.",
+    "blocklist_save_error":
+        "I can't save the list right now. Please try again in a moment.",
+    "block_added": "Ok, I blocked {term}.",
+    "ask_unblock": "I didn't catch what to unblock. Can you repeat?",
+    "not_in_blocklist": "{term} is not in the blocked-songs list.",
+    "blocklist_update_error":
+        "I can't update the list right now. Please try again in a moment.",
+    "block_removed": "Ok, I unblocked {term}.",
+    "blocklist_empty": "The blocked-songs list is empty.",
+    "blocklist_listing": "Blocked songs: {terms}.",
+
+    # -- web router (localvoice) ---------------------------------------------
+    "heard_nothing": "I didn't hear anything.",
+    "router_fallback":
+        "I didn't understand. Try: play, play the album, from my music, "
+        "or which albums do I have by.",
+    "internal_error": "Internal error: {error}",
+
+    # -- Alexa skill -----------------------------------------------------------
+    "launch":
+        "System ready. You can say, for example: play Comfortably Numb by "
+        "Pink Floyd; play the album The Wall; play music by Aerosmith; or "
+        "pause. What shall we listen to?",
+    "launch_no_personalization": " Personalization not configured yet.",
+    "help":
+        "I can play a track, an album, an artist or a playlist, from streaming "
+        "or from your music. Try: play Time by Pink Floyd; play the album The "
+        "Wall; which albums do I have by Yes, then play number two. I can also "
+        "pause, change track and adjust the volume. What do you want to listen to?",
+    "alexa_fallback": "I didn't understand. Try saying: play, or play music by.",
+    "alexa_error": "Something went wrong with the system. Please try again shortly.",
+}
+
+CATALOGS = {"it": IT, "en": EN}
 DEFAULT_LANG = "it"
+
+# Per-request language, so concurrent web requests in different languages don't
+# step on each other (contextvars are async- and thread-safe per execution
+# context; our HTTP server is thread-per-request).
+import contextvars as _contextvars
+
+_current_lang = _contextvars.ContextVar("squeezesay_lang", default=DEFAULT_LANG)
+
+
+def set_lang(lang: str) -> None:
+    """Select the reply language for the current request; unsupported values
+    fall back to the default (Italian)."""
+    _current_lang.set(lang if lang in CATALOGS else DEFAULT_LANG)
+
+
+def get_lang() -> str:
+    return _current_lang.get()
 
 
 def msg(key: str, *, lang: str = None, **kwargs) -> str:
-    """The message for ``key`` in ``lang`` (default Italian), formatted with
-    ``kwargs``. A missing key raises ``KeyError`` — a wrong key is a bug, not
-    a runtime condition to paper over."""
-    return CATALOGS[lang or DEFAULT_LANG][key].format(**kwargs)
+    """The message for ``key`` in ``lang`` (default: the per-request language
+    set via :func:`set_lang`, else Italian), formatted with ``kwargs``. A
+    missing key raises ``KeyError`` — a wrong key is a bug, not a runtime
+    condition to paper over."""
+    return CATALOGS[lang or _current_lang.get()][key].format(**kwargs)

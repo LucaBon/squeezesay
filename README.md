@@ -124,7 +124,10 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
 
 ## Honest caveats
 
-- **The voice interface is Italian only** (it-IT interaction model + Italian responses).
+- **The voice interface speaks Italian and English.** Web app: pick the mic
+  language on the page (commands are parsed and answered in that language).
+  Alexa: import `interaction-models/en-US.json` for an English skill. Other
+  languages fall back to Italian for now.
 - **The Alexa path needs an always-on home host + an HTTPS tunnel** (Cloudflare
   Tunnel/ngrok): Alexa runs in the cloud and can't reach your LMS otherwise. The
   **local web app needs none of that.**

@@ -136,13 +136,16 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 # then TIDAL. Explicit phrases ("dalla mia musica", "da tidal") and
                 # an explicit source still override.
                 source = payload.get("source") or "auto"
+                # The language the user is speaking (the page's mic-language
+                # selector): commands are parsed and answered in that language.
+                lang = payload.get("lang") or "it"
                 # Prefer the ASR alternatives when present (mic hands-free mode);
                 # the plain text box just sends one string.
                 alternatives = payload.get("alternatives") or ([text] if text else [])
             except (ValueError, UnicodeDecodeError):
-                source, alternatives = "auto", []
+                source, alternatives, lang = "auto", [], "it"
             try:
-                result = router_for(client_id).handle_many(alternatives, source)
+                result = router_for(client_id).handle_many(alternatives, source, lang)
             except Exception as exc:  # never 500 the client
                 result = {"speech": msg("internal_error", error=exc), "used": text,
                           "ok": False, "error": str(exc), "terms": []}
