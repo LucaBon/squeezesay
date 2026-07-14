@@ -14,9 +14,11 @@ nessun cloud, nessun account, i comandi restano nella tua rete.
    LMS viene rilevato automaticamente sulla LAN (UDP) e viene usato il primo
    player trovato.
 3. Apri `https://<ip-di-home-assistant>:8730` da telefono/tablet/PC sulla
-   stessa rete e accetta **una volta** l'avviso del certificato self-signed
-   (necessario: il microfono del browser richiede HTTPS). Consiglio: aggiungi
-   la pagina alla home del telefono.
+   stessa rete e accetta **una volta** l'avviso del certificato (necessario:
+   il microfono del browser richiede HTTPS). Meglio ancora: dal pannello
+   **"📱 Installa come app"** della pagina scarica `/ca.pem` e installala come
+   certificato CA — lucchetto verde, niente avvisi, e la pagina si installa
+   come **app vera** (PWA) sul telefono.
 
 Poi parla (o scrivi), in italiano: «metti l'album The Wall», «dalla mia musica
 metti Aerosmith», «quali album ho di Yes» → «metti la 2», «pausa», «alza il

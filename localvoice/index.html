@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2d7d46">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Impianto — voce locale</title>
 <style>
   :root { color-scheme: light dark; }
@@ -93,6 +97,23 @@
   </details>
   <div class="hint">Suggerimento: se un <b>nome inglese</b> viene capito male (es. «Audioslave» →
     «audio slave»), correggilo nella casella e premi Invia.</div>
+  <details class="hint" id="installpanel" style="max-width:480px">
+    <summary>📱 Installa come app (senza avvisi del certificato)</summary>
+    <ol style="text-align:left; padding-left:1.2rem; margin:.4rem 0">
+      <li>Scarica la CA locale: <a id="calink" href="/ca.pem">ca.pem</a> (una volta sola per dispositivo).</li>
+      <li><b>Android</b>: Impostazioni → Sicurezza → Altro / Crittografia e credenziali →
+        Installa un certificato → <b>Certificato CA</b> → scegli il file scaricato.<br>
+        <b>iPhone/iPad</b>: apri il file → Impostazioni → Profilo scaricato → Installa; poi
+        Impostazioni → Generali → Info → Impostazioni certificati → attiva la fiducia.<br>
+        <b>PC</b>: doppio clic su ca.pem → installa in «Autorità di certificazione radice attendibili»
+        (Windows) o nel Portachiavi (macOS).</li>
+      <li>Riapri questa pagina: lucchetto verde, niente più avvisi. Ora dal menu del browser
+        scegli <b>Installa app</b> / <b>Aggiungi a schermata Home</b>: si apre a tutto schermo
+        come un'app vera.</li>
+    </ol>
+    <div>La CA è generata in casa tua e firma solo questo server: non dà a nessun altro
+      la possibilità di intercettare il tuo traffico.</div>
+  </details>
   <a class="hint" id="material" href="__MATERIAL_URL__" target="_blank" rel="noopener">
     Vuoi vedere coda, copertine e sfogliare? Apri Material Skin ↗</a>
 
@@ -524,6 +545,14 @@ if (!SR) {
     $("wakehint").style.display = on ? "" : "none";
     if (on) startWake(); else stopAll();
   };
+}
+
+// PWA: registra il service worker (shell offline + installabilità). Chrome lo
+// accetta solo su HTTPS *fidato* — cioè con la CA locale installata (vedi il
+// pannello «Installa come app»), non col certificato accettato dopo l'avviso.
+// Il fallimento è normale e silenzioso finché la CA non è installata.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 </script>
 </body>

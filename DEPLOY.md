@@ -72,13 +72,25 @@ and speak, or type. The player is auto-detected (override with `--player <MAC>`)
 ### Microphone from other devices = HTTPS required
 
 The browser mic works without a certificate only on `localhost`. From a phone the browser
-requires **HTTPS**. Generate a self-signed cert and start in HTTPS:
+requires **HTTPS**. Generate the certificate and start in HTTPS:
 
 ```bash
-uv run python tools/make_cert.py     # writes cert.pem / key.pem (SAN = this PC's IP)
+uv run python tools/make_cert.py     # writes ca.pem + cert.pem/key.pem (SAN = this PC's IP)
 uv run python localvoice/server.py --cert cert.pem --key key.pem
 # open https://<this-pc-ip>:8730  (accept the warning once)
 ```
+
+`make_cert.py` creates a private **"SqueezeSay Local CA"** (reused on every rerun)
+and signs the server certificate with it. You can stop at the one-time browser
+warning — everything works as before — or go one step further:
+
+**Install the CA once per device → green lock + installable app.** The server
+offers the CA at **`/ca.pem`** (the page's *"📱 Installa come app"* panel has
+per-OS steps). Once trusted, the warning disappears **and** the service worker
+turns on, so *Install app / Add to Home Screen* gives a real fullscreen PWA
+with an offline shell. (Chrome refuses service workers on untrusted certificates,
+even after clicking through the warning — that's why the CA matters for the PWA.)
+Re-issuing the server cert for new IPs reuses the CA, so devices stay trusted.
 
 The **text box works everywhere**, even over HTTP.
 
@@ -98,9 +110,10 @@ The **text box works everywhere**, even over HTTP.
 2. Open **Chrome/Edge** at `https://<this-pc-ip>:8730`.
 3. First time: "connection not private" (self-signed cert) → **Advanced → Proceed**, once.
 4. Tap the **mic**, allow the permission, speak in Italian — or use the text box. The
-   reply shows on screen (silent by default). Tip: **Add to Home Screen** to use it like
-   an app. When the reply offers a numbered list, its choices appear as **tappable
-   buttons** — tap instead of saying "metti la 2".
+   reply shows on screen (silent by default). Tip: install the **local CA** (page panel
+   *"📱 Installa come app"* → `/ca.pem`) and then **Install app**: green lock, no
+   warnings, fullscreen app icon. When the reply offers a numbered list, its choices
+   appear as **tappable buttons** — tap instead of saying "metti la 2".
 5. Optional, hands-free: tick **"attiva a voce con una parola chiave"** and start commands
    with the wake word ("impianto" by default) — «impianto metti Time».
 6. Want the reply read aloud too? Tick **"🔊 leggi la risposta ad alta voce"**; the

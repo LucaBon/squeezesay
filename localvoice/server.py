@@ -36,6 +36,20 @@ from router import Router  # noqa: E402
 
 INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
 
+# PWA assets, read once at startup like the page itself. ca.pem is resolved at
+# runtime (next to --cert) so the phone can download and trust the local CA.
+def _read_bytes(name: str) -> bytes:
+    with open(os.path.join(HERE, name), "rb") as f:
+        return f.read()
+
+STATIC = {
+    "/manifest.webmanifest": (_read_bytes("manifest.webmanifest"),
+                              "application/manifest+json"),
+    "/sw.js": (_read_bytes("sw.js"), "text/javascript"),
+    "/icon-192.png": (_read_bytes("icon-192.png"), "image/png"),
+    "/icon-512.png": (_read_bytes("icon-512.png"), "image/png"),
+}
+
 
 def lan_ips() -> list:
     """This machine's primary LAN IPv4, for printing a ready-to-open URL.
@@ -64,7 +78,8 @@ def lan_ips() -> list:
     return []
 
 
-def make_handler(lms, material_url: str, services, default_service: str):
+def make_handler(lms, material_url: str, services, default_service: str,
+                 ca_path=None):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
     # two phones don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
@@ -95,6 +110,14 @@ def make_handler(lms, material_url: str, services, default_service: str):
                 page = INDEX_HTML.replace("__MATERIAL_URL__", material_url)
                 page = page.replace("__SERVICES__", json.dumps(services))
                 self._send(200, page, "text/html")
+            elif self.path in STATIC:
+                data, ctype = STATIC[self.path]
+                self._send(200, data, ctype)
+            elif self.path == "/ca.pem" and ca_path and os.path.exists(ca_path):
+                # La CA locale da installare (una volta) sul telefono/PC: dopo,
+                # lucchetto verde e PWA installabile senza avvisi.
+                with open(ca_path, "rb") as f:
+                    self._send(200, f.read(), "application/x-pem-file")
             else:
                 self._send(404, "not found", "text/plain")
 
@@ -202,9 +225,16 @@ def main() -> int:
         print(f"--default-service non tra i servizi attivi: uso {default_service}")
 
     material_url = args.material_url or (lms_url.rstrip("/") + "/material/")
+    # La CA locale (se make_cert l'ha creata) vive accanto al certificato.
+    ca_path = None
+    if args.cert:
+        candidate = os.path.join(os.path.dirname(os.path.abspath(args.cert)), "ca.pem")
+        if os.path.exists(candidate):
+            ca_path = candidate
     httpd = ThreadingHTTPServer(
         (args.host, args.port),
-        make_handler(client, material_url, services, default_service),
+        make_handler(client, material_url, services, default_service,
+                     ca_path=ca_path),
     )
 
     scheme = "http"
@@ -236,6 +266,10 @@ def main() -> int:
     else:
         print("Microfono disponibile anche dal telefono (HTTPS). Al primo accesso "
               "accetta una volta l'avviso del certificato self-signed.")
+        if ca_path:
+            print("Per togliere l'avviso e installare la pagina come app: scarica "
+                  f"https://{hosts[0]}:{args.port}/ca.pem sul telefono e installala "
+                  "come certificato CA (una volta sola).")
     print("Ctrl+C per fermare.")
     try:
         httpd.serve_forever()
