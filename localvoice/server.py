@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(ROOT, "lambda"))  # actions, lms
 sys.path.insert(0, HERE)  # router
 
 import discovery  # noqa: E402
-from lms import LMSClient  # noqa: E402
+from lms import SERVICES, LMSClient  # noqa: E402
 from router import Router  # noqa: E402
 
 INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
@@ -63,18 +63,20 @@ def lan_ips() -> list:
     return []
 
 
-def make_handler(lms, material_url: str):
+def make_handler(lms, material_url: str, services, default_service: str):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
     # two phones don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
     routers = {}
     lock = threading.Lock()
+    services = list(services)
 
     def router_for(client_id: str) -> Router:
         with lock:
             r = routers.get(client_id)
             if r is None:
-                r = Router(lms)
+                r = Router(lms, default_service=default_service,
+                           services=tuple(services))
                 routers[client_id] = r
             return r
 
@@ -90,6 +92,7 @@ def make_handler(lms, material_url: str):
         def do_GET(self):
             if self.path in ("/", "/index.html"):
                 page = INDEX_HTML.replace("__MATERIAL_URL__", material_url)
+                page = page.replace("__SERVICES__", json.dumps(services))
                 self._send(200, page, "text/html")
             else:
                 self._send(404, "not found", "text/plain")
@@ -140,6 +143,13 @@ def main() -> int:
                     help="URL della UI da aprire col link 'Material Skin'. "
                          "Default: <lms>/material/ . Se Material Skin non è "
                          "installato, punta alla UI classica (es. <lms>/).")
+    ap.add_argument("--services", default="auto",
+                    help="servizi streaming offerti nel selettore, es. "
+                         "tidal,qobuz. Default 'auto': rileva i plugin "
+                         "installati sull'LMS (fallback: tidal).")
+    ap.add_argument("--default-service", default="tidal",
+                    help="servizio streaming usato in modalità automatica e "
+                         "quando la frase non ne nomina uno (default: tidal)")
     args = ap.parse_args()
 
     lms_url = args.lms
@@ -161,10 +171,39 @@ def main() -> int:
         player = players[0]["playerid"]
         print(f"Player: {players[0].get('name')} ({player})")
 
+    client = LMSClient(lms_url, player)
+
+    # Which streaming services the source selector offers. "auto" asks the LMS
+    # which plugins are installed; an explicit list skips the detection (the
+    # escape hatch if the apps query misbehaves on some LMS version).
+    if args.services.strip().lower() == "auto":
+        try:
+            services = client.installed_services()
+        except Exception:
+            services = []
+        if services:
+            print(f"Servizi streaming rilevati: {', '.join(services)}")
+        else:
+            services = ["tidal"]
+            print("Nessun servizio streaming rilevato: assumo TIDAL "
+                  "(indica i tuoi con --services tidal,qobuz).")
+    else:
+        services = [s.strip().lower() for s in args.services.split(",") if s.strip()]
+        unknown = [s for s in services if s not in SERVICES]
+        if unknown or not services:
+            print(f"--services non valido: {args.services!r} "
+                  f"(disponibili: {', '.join(SERVICES)})")
+            return 1
+
+    default_service = args.default_service.strip().lower()
+    if default_service not in services:
+        default_service = services[0]
+        print(f"--default-service non tra i servizi attivi: uso {default_service}")
+
     material_url = args.material_url or (lms_url.rstrip("/") + "/material/")
     httpd = ThreadingHTTPServer(
         (args.host, args.port),
-        make_handler(LMSClient(lms_url, player), material_url),
+        make_handler(client, material_url, services, default_service),
     )
 
     scheme = "http"

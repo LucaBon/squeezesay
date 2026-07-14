@@ -9,6 +9,9 @@ LMS_BASE_URL = "https://xxxx.trycloudflare.com"  # URL HTTPS del tunnel verso LM
 LMS_PLAYER_ID = "aa:bb:cc:dd:ee:ff"              # MAC del player Daphile
 LMS_USERNAME = ""                                 # se il tunnel usa Basic Auth
 LMS_PASSWORD = ""
+# Servizio streaming usato dalla skill: "tidal" (default) o "qobuz". Il plugin
+# corrispondente deve essere installato e loggato su LMS/Daphile.
+MUSIC_SERVICE = "tidal"
 
 # --- Filtro per età / riconoscimento voce (opzionale) ---
 # Il tuo personId di Alexa Voice ID: quando parli tu accesso pieno, per chiunque

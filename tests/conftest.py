@@ -58,16 +58,18 @@ def transport():
 
 
 @pytest.fixture
-def make_tidal():
-    """Factory for a fake TIDAL app-feed handler (3-level OPML navigation).
+def make_feed():
+    """Factory for a fake streaming app-feed handler (3-level OPML navigation).
 
-    Simulates the real plugin: home menu exposes a 'search' node; entering it
-    with ``search:`` returns category nodes; entering a category id returns its
-    items; and ``["tidal","playlist","play",...]`` is the container play action.
+    Simulates a real plugin (TIDAL, Qobuz — the handler never looks at the
+    feed tag, so key it under any service): home menu exposes a 'search' node;
+    entering it with ``search:`` returns category nodes; entering a category id
+    returns its items; and ``["<tag>","playlist","play",...]`` is the container
+    play action.
 
     Wire it up with::
 
-        transport.responses["tidal"] = make_tidal(
+        transport.responses["tidal"] = make_feed(
             categories={"Songs": "S", "Artists": "A"},
             items={"S": [{"isaudio": 1, "url": "tidal://42.flc", "name": "Time"}]},
         )
@@ -100,9 +102,26 @@ def make_tidal():
 
 
 @pytest.fixture
+def make_tidal(make_feed):
+    """Backward-compatible alias for :func:`make_feed`."""
+    return make_feed
+
+
+@pytest.fixture
 def lms(transport):
     return LMSClient(
         base_url="http://lms.local:9000",
         player_id="aa:bb:cc:dd:ee:ff",
         transport=transport,
+    )
+
+
+@pytest.fixture
+def qobuz(transport):
+    """An LMSClient bound to the Qobuz service, same fake transport."""
+    return LMSClient(
+        base_url="http://lms.local:9000",
+        player_id="aa:bb:cc:dd:ee:ff",
+        transport=transport,
+        service="qobuz",
     )

@@ -106,6 +106,31 @@ The **text box works everywhere**, even over HTTP.
 6. Want the reply read aloud too? Tick **"🔊 leggi la risposta ad alta voce"**; the
    **Voci & lingue** panel then lets you pick natural per-language voices.
 
+### Streaming services (TIDAL / Qobuz)
+
+Install and log in the plugin(s) on LMS/Daphile first (**LMS Settings → Plugins**:
+*TIDAL* and/or *Qobuz*). Then:
+
+- **Web app**: by default the server **auto-detects** the installed plugins and the
+  page's "Sorgente musica" selector only shows what's really there. Override with
+  `--services tidal,qobuz` (skips detection) and pick which one "auto" mode falls
+  back to with `--default-service qobuz`. Spoken phrases «da tidal …» / «da qobuz …»
+  always win over the selector. (Docker needs nothing: detection is the default.)
+- **Alexa skill**: one service per skill, chosen with `MUSIC_SERVICE=tidal|qobuz`
+  (env var or `config.py`; default `tidal`).
+
+> [!NOTE]
+> Qobuz support is verified against a live LMS 9.0.3 + plugin-Qobuz 3.7.0. If the
+> plugin's **login fails with "authorization failed"** despite correct credentials:
+> Qobuz has been tightening third-party authentication (mid-2026) and the
+> email+password login can 401 intermittently — make sure the account has a real
+> password (accounts created via Google/Apple sign-in need one set on qobuz.com),
+> then simply retry a few times; once a login succeeds the stored token keeps
+> working. To debug, set `plugin.qobuz` to Debug in LMS Settings → Advanced →
+> Logging (and set it back afterwards: at Debug level the plugin writes your
+> password's MD5 hash into server.log). To validate the SqueezeSay side, run
+> `uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"`.
+
 ---
 
 ## B) Alexa skill (Echo)
@@ -130,7 +155,8 @@ You get an `https://….trycloudflare.com` URL → that's your `LMS_BASE_URL`. *
 3. **Code** tab: replace the contents with our `lambda_function.py`, `actions.py`,
    `lms.py`; put `ask-sdk-core` in `requirements.txt`. Create a **`config.py`**
    (see `lambda/config.example.py`) with `LMS_BASE_URL` (the tunnel URL) and
-   `LMS_PLAYER_ID`. **Save** → **Deploy**.
+   `LMS_PLAYER_ID` (optional: `MUSIC_SERVICE = "qobuz"` to stream from Qobuz
+   instead of TIDAL). **Save** → **Deploy**.
 4. **Test** tab: enable **Development** — the skill is now usable **only on your
    account** (no publishing, no Italian-store problem).
 
@@ -141,7 +167,8 @@ Try: «Alexa, apri impianto» → «metti l'album The Wall».
 2. AWS Console → **Lambda → Create function** → Runtime **Python 3.12** → upload
    `skill.zip` → **Handler** `lambda_function.handler`.
 3. **Configuration → Environment variables**: `LMS_BASE_URL`, `LMS_PLAYER_ID`,
-   (optional) `LMS_USERNAME`/`LMS_PASSWORD`.
+   (optional) `LMS_USERNAME`/`LMS_PASSWORD`, (optional) `MUSIC_SERVICE`
+   (`tidal`, default, or `qobuz`).
 4. **Add trigger → Alexa Skills Kit** (paste the Skill ID from step 5).
 5. Developer Console: create a **Custom** skill (hosting *Provision your own*), import the
    it-IT model, put the Lambda **ARN** in **Endpoint** → **Build Model** → **Test**.

@@ -47,6 +47,7 @@ def _lms():
         player_id=_cfg("LMS_PLAYER_ID"),
         username=_cfg("LMS_USERNAME") or None,
         password=_cfg("LMS_PASSWORD") or None,
+        service=(_cfg("MUSIC_SERVICE") or "tidal").strip().lower(),
     )
 
 
@@ -368,8 +369,8 @@ class HelpHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         return _respond(
             handler_input,
-            "Posso riprodurre un brano, un album, un artista o una playlist, da TIDAL o "
-            "dalla tua musica. Prova: riproduci Time dei Pink Floyd; metti l'album The "
+            "Posso riprodurre un brano, un album, un artista o una playlist, in streaming "
+            "o dalla tua musica. Prova: riproduci Time dei Pink Floyd; metti l'album The "
             "Wall; quali album ho di Yes, poi metti la due. Posso anche mettere in pausa, "
             "cambiare traccia e regolare il volume. Cosa vuoi ascoltare?",
             end=False,

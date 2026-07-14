@@ -403,3 +403,67 @@ def test_unrecognised(router):
 
 def test_empty(router):
     assert router.handle("   ") == "Non ho sentito niente."
+
+
+# -- Qobuz as a second streaming service -----------------------------------
+def test_source_qobuz_generic_play(router, transport, make_feed):
+    transport.responses["qobuz"] = make_feed(
+        categories={"Tracks": "T"},
+        items={"T": [{"isaudio": 1, "url": "qobuz://9.flac", "name": "Time"}]},
+    )
+    assert router.handle("riproduci Time", source="qobuz") == "Riproduco Time."
+    assert ["playlist", "play", "qobuz://9.flac"] in transport.commands()
+    assert not any(cmd[0] == "tidal" for cmd in transport.commands())
+
+
+def test_explicit_qobuz_overrides_local_source(router, transport, make_feed):
+    transport.responses["qobuz"] = make_feed(
+        categories={"Tracks": "T"},
+        items={"T": [{"isaudio": 1, "url": "qobuz://9.flac", "name": "Time"}]},
+    )
+    assert router.handle("da qobuz riproduci Time", source="local") == "Riproduco Time."
+    assert ["playlist", "play", "qobuz://9.flac"] in transport.commands()
+
+
+def test_explicit_tidal_wins_over_qobuz_source(router, transport, make_feed):
+    transport.responses["tidal"] = make_feed(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://9.flc", "name": "Time"}]},
+    )
+    assert router.handle("da tidal riproduci Time", source="qobuz") == "Riproduco Time."
+    assert ["playlist", "play", "tidal://9.flc"] in transport.commands()
+    assert not any(cmd[0] == "qobuz" for cmd in transport.commands())
+
+
+def test_auto_source_falls_back_to_default_service_qobuz(lms, transport, make_feed):
+    from router import Router
+
+    qrouter = Router(lms, default_service="qobuz")
+    for name in ("albums", "artists", "titles"):
+        transport.responses[name] = {"count": 0}  # nothing local
+    transport.responses["qobuz"] = make_feed(
+        categories={"Tracks": "T"},
+        items={"T": [{"isaudio": 1, "url": "qobuz://9.flac", "name": "Time"}]},
+    )
+    assert qrouter.handle("riproduci Time", source="auto") == "Riproduco Time."
+    assert ["playlist", "play", "qobuz://9.flac"] in transport.commands()
+    assert not any(cmd[0] == "tidal" for cmd in transport.commands())
+
+
+def test_playlist_follows_qobuz_source(router, transport, make_feed):
+    transport.responses["qobuz"] = make_feed(
+        categories={"Playlists": "P"},
+        items={"P": [{"type": "playlist", "id": "PL", "name": "Chill"}]},
+    )
+    router.handle("metti la playlist Chill", source="qobuz")
+    assert ["qobuz", "playlist", "play", "item_id:PL"] in transport.commands()
+
+
+def test_unknown_source_uses_default_service(router, transport, make_feed):
+    # A stray/unknown selector value must not crash: it streams from the default.
+    transport.responses["tidal"] = make_feed(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://9.flc", "name": "Time"}]},
+    )
+    assert router.handle("riproduci Time", source="deezer") == "Riproduco Time."
+    assert ["playlist", "play", "tidal://9.flc"] in transport.commands()

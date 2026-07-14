@@ -93,7 +93,7 @@ def test_get_players_handles_missing_loop(lms, transport):
 # -- TIDAL 3-level navigation ---------------------------------------------
 def test_search_node_id(lms, transport, make_tidal):
     transport.responses["tidal"] = make_tidal(search_node="7")
-    assert lms.tidal_search_node_id() == "7"
+    assert lms.search_node_id() == "7"
     # queried the home menu (no item_id)
     _player, cmd = transport.last_call()
     assert cmd[:2] == ["tidal", "items"]
@@ -102,14 +102,14 @@ def test_search_node_id(lms, transport, make_tidal):
 
 def test_search_node_id_none_when_absent(lms, transport):
     transport.responses["tidal"] = {"loop_loop": [{"id": "0", "type": "link", "name": "Home"}]}
-    assert lms.tidal_search_node_id() is None
+    assert lms.search_node_id() is None
 
 
 def test_search_categories(lms, transport, make_tidal):
     transport.responses["tidal"] = make_tidal(
         search_node="7", categories={"Songs": "7_q.4", "Artists": "7_q.2"}
     )
-    cats = lms.tidal_search_categories("pink floyd")
+    cats = lms.search_categories("pink floyd")
     assert cats == {"Songs": "7_q.4", "Artists": "7_q.2"}
 
 

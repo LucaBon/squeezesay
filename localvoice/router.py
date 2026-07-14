@@ -4,11 +4,13 @@ Maps free Italian text (from the browser's speech recognition, or a text box) to
 the SAME action functions used by the Alexa skill (``actions.py`` + ``lms.py``).
 No cloud, no Alexa — just rules over the transcribed text.
 
-Two music sources:
-- **TIDAL** (default) and **local library** (USB disk). Ambiguous commands
-  ("riproduci X", "metti l'album X", "metti la musica di X") follow the ``source``
-  passed by the UI selector. Explicit phrases always win: "dalla mia musica …"
-  forces local, "da tidal …" forces TIDAL, regardless of the selector.
+Music sources:
+- **local library** (USB disk) and the **streaming services** (TIDAL, Qobuz).
+  Ambiguous commands ("riproduci X", "metti l'album X", "metti la musica di X")
+  follow the ``source`` passed by the UI selector; "auto" tries local first,
+  then the configured default streaming service. Explicit phrases always win:
+  "dalla mia musica …" forces local, "da tidal …" / "da qobuz …" force that
+  service, regardless of the selector.
 
 State (the last read-out list) is kept in-instance for the "metti la N" choice.
 """
@@ -21,6 +23,7 @@ import actions
 
 _LOCAL = r"(?:dalla mia musica|dal disco|in locale|dalla libreria)"
 _TIDAL = r"(?:da tidal|su tidal|con tidal)"
+_QOBUZ = r"(?:da qobuz|su qobuz|con qobuz)"
 
 # Web Speech (it-IT) transcribes a spoken position as a word ("tre"), not "3".
 _NUM_WORDS = {
@@ -40,13 +43,23 @@ def _as_number(token):
 
 
 class Router:
-    def __init__(self, lms):
+    def __init__(self, lms, default_service="tidal", services=("tidal", "qobuz")):
         self.lms = lms
+        # Streaming sources this router accepts as a ``source`` value; anything
+        # else streams from ``default_service`` (also the "auto" fallback).
+        self.default_service = default_service
+        self.services = tuple(services)
         self.candidates = None  # candidates from the last list command
         # True when THIS turn opened a numbered list (a list command or a
         # 'did you mean'), so the web client can render tappable choice buttons
         # only for the reply that offers them, not on every later reply.
         self._opened = False
+
+    def _stream(self, source):
+        """The LMS client for a streaming request: bound to ``source`` when
+        it names a known service, else to the default streaming service."""
+        name = source if source in self.services else self.default_service
+        return self.lms.for_service(name)
 
     def _remember(self, result: dict) -> str:
         self.candidates = result["candidates"] or None
@@ -62,20 +75,22 @@ class Router:
             self._opened = True
         return result
 
-    def _play_auto(self, arg: str, tidal_fn):
+    def _play_auto(self, arg: str, stream_fn, stream):
         """Auto source: prefer a confident local-library hit, else fall back to
-        TIDAL. play_local only plays when it matches, so a miss has no effect."""
+        the default streaming service (no cascading across services).
+        play_local only plays when it matches, so a miss has no effect."""
         res = actions.play_local(self.lms, arg)
         if getattr(res, "ok", False):
             return res
-        return tidal_fn(self.lms, arg)
+        return stream_fn(stream, arg)
 
-    def _resolve(self, arg: str, tidal_fn, local: bool, auto: bool):
-        if local:
+    def _resolve(self, arg: str, stream_fn, source: str):
+        if source == "local":
             return self._played(actions.play_local(self.lms, arg))
-        if auto:
-            return self._played(self._play_auto(arg, tidal_fn))
-        return self._played(tidal_fn(self.lms, arg))
+        stream = self._stream(source)
+        if source == "auto":
+            return self._played(self._play_auto(arg, stream_fn, stream))
+        return self._played(stream_fn(stream, arg))
 
     def handle_many(self, alternatives, source: str = "tidal") -> dict:
         """Try each speech-recognition alternative until one is a hit.
@@ -125,8 +140,6 @@ class Router:
         t = (text or "").strip()
         if not t:
             return "Non ho sentito niente."
-        local = source == "local"
-        auto = source == "auto"  # try local first, else TIDAL (default in the web app)
 
         # A play command carries a title after the verb; its transport-sounding
         # words ("Don't Stop Me Now" -> "stop", "Play" -> "play") must NOT be
@@ -170,7 +183,9 @@ class Router:
         if number is not None:
             return actions.choose_from(self.lms, self.candidates, number)
 
-        # 3) explicit source override phrases (win over the selector)
+        # 3) explicit source override phrases (win over the selector). Like the
+        # original TIDAL phrase, service phrases route only the generic
+        # play_song; album/artist follow the selector.
         m = re.search(rf"{_LOCAL}\s+(?:metti\s+|riproduci\s+)?(.+)$", t, re.I)
         if m:
             return self._played(actions.play_local(self.lms, m.group(1).strip()))
@@ -179,7 +194,12 @@ class Router:
             return self._played(actions.play_local(self.lms, m.group(1).strip()))
         m = re.search(rf"{_TIDAL}\s+(?:metti\s+|riproduci\s+)?(.+)$", t, re.I)
         if m:
-            return self._played(actions.play_song(self.lms, m.group(1).strip()))
+            return self._played(
+                actions.play_song(self.lms.for_service("tidal"), m.group(1).strip()))
+        m = re.search(rf"{_QOBUZ}\s+(?:metti\s+|riproduci\s+)?(.+)$", t, re.I)
+        if m:
+            return self._played(
+                actions.play_song(self.lms.for_service("qobuz"), m.group(1).strip()))
 
         # 4) lists that open a numbered choice
         m = re.search(r"(?:quali|che).{0,12}album.{0,4}di\s+(.+)$", t, re.I)
@@ -188,8 +208,9 @@ class Router:
         m = re.search(
             r"(?:quali.{0,10}brani|top tracks|brani.{0,15}ascoltati).*?di\s+(.+)$", t, re.I
         )
-        if m:  # top tracks -> TIDAL
-            return self._remember(actions.top_tracks_list(self.lms, m.group(1).strip()))
+        if m:  # top tracks -> streaming (selected or default service)
+            return self._remember(
+                actions.top_tracks_list(self._stream(source), m.group(1).strip()))
 
         # 4b) name-based choice from the last read-out list (only while a list is
         # open). "metti Supernatural" / "l'album Supernatural" / bare
@@ -210,18 +231,18 @@ class Router:
                 if chosen is not None:
                     return chosen
 
-        # 5) album — TIDAL or local per selector
+        # 5) album — streaming or local per selector
         m = re.search(r"(?:metti|riproduci|fai partire)\s+l['’]?\s*album\s+(.+)$", t, re.I)
         if m:
-            return self._resolve(m.group(1).strip(), actions.play_album, local, auto)
+            return self._resolve(m.group(1).strip(), actions.play_album, source)
 
-        # 6) playlist (TIDAL)
+        # 6) playlist (streaming: selected or default service)
         m = re.search(r"(?:metti|riproduci|fai partire)\s+la\s+playlist\s+(.+)$", t, re.I)
         if m:
-            return actions.play_playlist(self.lms, m.group(1).strip())
+            return actions.play_playlist(self._stream(source), m.group(1).strip())
 
-        # 7) artist — TIDAL or local per selector. Accepts "(la) musica di/dei/
-        # degli/delle/del/della/dell' X", "l'artista X", "le canzoni di X".
+        # 7) artist — streaming or local per selector. Accepts "(la) musica di/
+        # dei/degli/delle/del/della/dell' X", "l'artista X", "le canzoni di X".
         m = re.search(
             r"(?:metti|riproduci|fai partire)\s+"
             r"(?:(?:la\s+)?musica\s+(?:di|dei|degli|delle|del|della|dell['’])"
@@ -230,12 +251,12 @@ class Router:
             re.I,
         )
         if m:
-            return self._resolve(m.group(1).strip(), actions.play_artist, local, auto)
+            return self._resolve(m.group(1).strip(), actions.play_artist, source)
 
-        # 8) generic play — TIDAL or local per selector ("titolo dall'album X" ok su TIDAL)
+        # 8) generic play — streaming or local per selector
         m = re.search(r"(?:riproduci|metti|suona|fai partire|voglio ascoltare)\s+(.+)$", t, re.I)
         if m:
-            return self._resolve(m.group(1).strip(), actions.play_song, local, auto)
+            return self._resolve(m.group(1).strip(), actions.play_song, source)
 
         return (
             "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "

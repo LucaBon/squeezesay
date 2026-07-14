@@ -47,8 +47,9 @@
   <h1>🎵 Impianto — comando vocale locale</h1>
   <button id="mic" title="Tieni premuto o clicca e parla">🎙️</button>
   <div id="status" class="hint">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
-  <div class="hint">Cerca da solo nella <b>tua libreria</b> e su <b>TIDAL</b>.
-    Per forzare la sorgente: «<i>dalla mia musica</i> …» oppure «<i>da tidal</i> …».</div>
+  <div class="hint">Cerca da solo nella <b>tua libreria</b> e in <b>streaming</b>.
+    Per forzare la sorgente: «<i>dalla mia musica</i> …», «<i>da tidal</i> …» o
+    «<i>da qobuz</i> …».</div>
   <div class="row">
     <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off">
     <button class="send" id="send">Invia</button>
@@ -57,6 +58,8 @@
     <label class="hint"><input type="checkbox" id="autosend"> invia subito dopo il microfono (mani libere)</label>
     <label class="vrow hint" style="width:100%">Lingua che parlo al microfono
       <select id="reclang"></select></label>
+    <label class="vrow hint" style="width:100%">Sorgente musica
+      <select id="source"></select></label>
     <label class="hint"><input type="checkbox" id="wakemode"> attiva a voce con una parola chiave
       <input id="wakeword" type="text" value="impianto" autocomplete="off"></label>
     <div id="wakehint" class="hint" style="display:none; text-align:left">Ascolto continuo: il microfono
@@ -84,7 +87,7 @@
       <li>«riproduci Comfortably Numb dei Pink Floyd»</li>
       <li>«metti l'album The Wall» · «metti la musica di Aerosmith»</li>
       <li>«quali album ho di Yes» → «metti la 2» (o «metti Fragile»)</li>
-      <li>«dalla mia musica metti …» · «da tidal metti …»</li>
+      <li>«dalla mia musica metti …» · «da tidal metti …» · «da qobuz metti …»</li>
       <li>«pausa» · «riprendi» · «prossima» · «alza il volume» · «cosa sta suonando»</li>
     </ul>
   </details>
@@ -294,11 +297,29 @@ $("wakeword").oninput = () => {
   $("wwlabel").textContent = wakeWord();
 };
 
+// --- music source selector (auto / local / streaming services) ---
+// The server substitutes __SERVICES__ with the streaming services actually
+// available on the LMS, so e.g. Qobuz only shows up when its plugin is there.
+const SERVICES = __SERVICES__;
+const SERVICE_NAMES = { tidal: "TIDAL", qobuz: "Qobuz" };
+(function initSource() {
+  const sel = $("source");
+  const opts = [["auto", "Automatica: libreria, poi streaming"],
+                ["local", "Solo la mia libreria"]]
+    .concat(SERVICES.map(s => [s, "Solo " + (SERVICE_NAMES[s] || s)]));
+  sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join("");
+  const saved = localStorage.getItem("source") || "auto";
+  // A saved service that is no longer offered falls back to auto.
+  sel.value = opts.some(([v]) => v === saved) ? saved : "auto";
+  sel.onchange = () => localStorage.setItem("source", sel.value);
+})();
+const currentSource = () => $("source").value || "auto";
+
 async function send(text, alternatives) {
   text = (text || "").trim();
   if (!text) return;
   bubble(text, "you");
-  const body = { text, client: clientId() };
+  const body = { text, client: clientId(), source: currentSource() };
   if (alternatives && alternatives.length > 1) body.alternatives = alternatives;
   try {
     const r = await fetch("/command", {

@@ -3,7 +3,8 @@
 > Say **«metti Comfortably Numb dei Pink Floyd»** — and the *exact* song plays on your hi-fi.
 
 **Hands-free Italian voice control for a [Daphile](https://www.daphile.com/) /
-[Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) system — TIDAL included.**
+[Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) system — TIDAL and
+Qobuz included.**
 No cloud required, no LLM, no compromise on sound: SqueezeSay sends **only control
 commands**, while the audio keeps flowing LMS → Squeezelite → your DAC, bit-perfect.
 
@@ -42,7 +43,8 @@ no LLM), so behaviour is testable and repeatable.
 | | |
 |---|---|
 | 🧠 **Title / artist / album parsing** | "metti Comfortably Numb **dei** Pink Floyd" → title + artist; "… **dall'album** X" → album. |
-| 🎯 **Artist-aware ranking** | TIDAL results are read in *menu mode*, which carries the **artist** — so among three "Comfortably Numb" it plays *Pink Floyd's* edition and confirms it out loud. |
+| 🎯 **Artist-aware ranking** | Streaming results are read in *menu mode*, which carries the **artist** — so among three "Comfortably Numb" it plays *Pink Floyd's* edition and confirms it out loud. |
+| 🎼 **Two streaming services** | **TIDAL** and **Qobuz** (plus your local library): pick one in the page's source selector — it only lists the plugins your LMS actually has — or just say «da qobuz metti …». "Auto" tries your library first, then the default service. |
 | ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — on both front-ends. On the web app the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
 | 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
 | 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
@@ -52,8 +54,8 @@ no LLM), so behaviour is testable and repeatable.
 
 ## Quick start — local web app
 
-Prereqs: an LMS/Daphile on the LAN with the TIDAL plugin installed and logged in,
-and at least one active player.
+Prereqs: an LMS/Daphile on the LAN with the TIDAL and/or Qobuz plugin installed
+and logged in, and at least one active player.
 
 **With Docker** (Linux / NAS / Raspberry Pi — easiest, HTTPS included):
 
@@ -78,7 +80,8 @@ uv run python localvoice/server.py          # auto-discovers LMS on the LAN
 Then say (or type), in Italian:
 
 > «metti Comfortably Numb dei Pink Floyd» · «metti l'album The Wall» ·
-> «dalla mia musica metti Aerosmith» · «quali album ho di Yes» → «metti la 2» ·
+> «dalla mia musica metti Aerosmith» · «da qobuz metti Time» ·
+> «quali album ho di Yes» → «metti la 2» ·
 > «pausa» · «alza il volume» · «cosa sta suonando»
 
 > [!NOTE]
@@ -108,13 +111,14 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # 258 tests, no network — uses a simulated LMS transport
+uv run pytest        # 286 tests, no network — uses a simulated LMS transport
 ```
 
-Validate against a real LMS+TIDAL (read-only, or `--play` to actually play):
+Validate against a real LMS (read-only, or `--play` to actually play):
 
 ```bash
 uv run python tools/probe_lms.py --query "Comfortably Numb dei Pink Floyd"
+uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
 ```
 
 ## Honest caveats
@@ -126,6 +130,16 @@ uv run python tools/probe_lms.py --query "Comfortably Numb dei Pink Floyd"
 - **Wake-word mode on Android beeps**: the browser plays its own earcon every time
   continuous listening restarts — a platform behaviour SqueezeSay can't silence
   (the app warns about it in-page).
-- TIDAL free-text search quality depends on the plugin; matching is deterministic (no
-  LLM). Natural TTS voices depend on your device/browser.
+- Streaming free-text search quality depends on the plugin; matching is deterministic
+  (no LLM). Natural TTS voices depend on your device/browser.
+- **Qobuz login on LMS can be flaky**: Qobuz has been tightening authentication
+  for third-party clients (mid-2026), so the plugin's email+password login may
+  fail with 401 a few times before it sticks — retry, or check the
+  troubleshooting notes in DEPLOY.md. Once logged in, the stored token keeps
+  working. (SqueezeSay's Qobuz support itself is verified against a live
+  LMS 9 + plugin-Qobuz 3.7.0.)
+- **No Spotify**: Spotify Lossless (launched Sept 2025) is not delivered to
+  third-party Connect clients, so the LMS plugin (Spotty/librespot) still gets
+  lossy Ogg Vorbis 320 kbps — pointless on a bit-perfect chain. If Spotify ever
+  opens lossless to the Connect API, a plugin path may become worth adding.
 - Bit-perfect: SqueezeSay sends **only commands**; ensure LMS doesn't resample to the player.
