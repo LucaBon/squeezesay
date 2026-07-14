@@ -35,13 +35,29 @@ _NUM_WORDS = {
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
 }
 
+# People answer a read-out list with "la seconda" / "the second one" at least
+# as often as with the bare number — but ONLY while a list is open: without
+# one, "metti la quinta" is music (Beethoven), not a pick, so ordinals are
+# gated on an open list while cardinals keep answering with a helpful hint.
+_ORDINAL_WORDS = {
+    "primo": 1, "prima": 1, "secondo": 2, "seconda": 2, "terzo": 3, "terza": 3,
+    "quarto": 4, "quarta": 4, "quinto": 5, "quinta": 5, "sesto": 6, "sesta": 6,
+    "settimo": 7, "settima": 7, "ottavo": 8, "ottava": 8, "nono": 9, "nona": 9,
+    "decimo": 10, "decima": 10,
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+    "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+}
 
-def _as_number(token):
+
+def _as_number(token, ordinals=False):
     """A spoken position -> int, or None if the token isn't a number."""
     token = (token or "").strip().lower()
     if token.isdigit():
         return int(token)
-    return _NUM_WORDS.get(token)
+    number = _NUM_WORDS.get(token)
+    if number is None and ordinals:
+        number = _ORDINAL_WORDS.get(token)
+    return number
 
 
 def _c(pattern):  # compiled, case-insensitive
@@ -58,6 +74,8 @@ PATTERNS = {
         "is_play": _c(r"\b(?:metti|rimetti|riproduci|suona|fai\s+partire|voglio\s+ascoltare)\b"),
         "pause_explicit": _c(r"\bin\s+pausa\b"),
         "pause": _c(r"\b(pausa|ferma|stop)\b"),
+        # Bare "play" always resumes, even though it is also a play verb.
+        "resume_explicit": _c(r"^play\s*$"),
         "resume": _c(r"\b(riprendi|riparti|continua|play)\b"),
         "next": _c(r"\b(success|prossim|avanti|salta)"),
         "prev": _c(r"\b(precedent|indietro|torna)"),
@@ -65,7 +83,9 @@ PATTERNS = {
         "vol_down": _c(r"(abbassa|diminuisci).{0,12}volume|pi[uù] piano"),
         "nowplaying": _c(r"(cosa|che).{0,8}(suona|canzone|ascolt)"),
         "choose_number": _c(r"(?:metti|scegli|voglio)?\s*(?:(?:la|il)\s+)?numero\s+([a-z0-9]+)\s*$"),
-        "choose_article": _c(r"(?:metti|scegli|voglio)?\s*(?:la|il)\s+([a-z0-9]+)\s*$"),
+        # "la 2" and ordinals: "la seconda", "metti la seconda canzone"
+        "choose_article": _c(r"(?:metti|scegli|voglio)?\s*(?:la|il)\s+([a-z0-9]+)"
+                             r"(?:\s+(?:canzone|brano|opzione))?\s*$"),
         "local_prefix": _c(rf"{_IT_LOCAL}\s+(?:metti\s+|riproduci\s+)?(.+)$"),
         "local_suffix": _c(rf"(?:metti|riproduci|suona)\s+(.+?)\s+{_IT_LOCAL}\s*$"),
         "service": r"(?:da {s}|su {s}|con {s})\s+(?:metti\s+|riproduci\s+)?(.+)$",
@@ -80,28 +100,46 @@ PATTERNS = {
         "generic_play": _c(r"(?:riproduci|metti|suona|fai partire|voglio ascoltare)\s+(.+)$"),
     },
     "en": {
-        "is_play": _c(r"\b(?:play|put\s+on|start|i\s+want\s+to\s+(?:hear|listen\s+to))\b"),
+        # ``put`` alone (not just "put on") so the suffix form "put X on" is
+        # guarded from transport words too ("put Don't Stop Me Now on").
+        "is_play": _c(r"\b(?:play|put|start|listen\s+to|i\s+want\s+to\s+(?:hear|listen\s+to))\b"),
         "pause_explicit": _c(r"\bon\s+pause\b"),
         "pause": _c(r"\b(pause|stop|halt)\b"),
+        # Bare "play" resumes (like a remote's ▶), even though it's a play verb.
+        "resume_explicit": _c(r"^(?:play|resume)\s*$"),
         "resume": _c(r"\b(resume|continue|unpause|keep\s+going)\b"),
         "next": _c(r"\b(next|skip|forward)\b"),
         "prev": _c(r"\b(previous|go\s+back|back)\b"),
-        "vol_up": _c(r"(turn|put|pump)?\s*up.{0,12}volume|volume\s+up|louder"),
-        "vol_down": _c(r"(turn|put)?\s*down.{0,12}volume|volume\s+down|lower.{0,12}volume|quieter|softer"),
-        "nowplaying": _c(r"what(?:'s|\s+is)?\s+(?:this|playing|the\s+song|song\s+is)|now\s+playing"),
+        "vol_up": _c(r"(?:turn|put|pump|crank)?\s*up.{0,12}volume|volume\s+up"
+                     r"|(?:raise|increase)\s.{0,8}volume|turn\s+it\s+up|louder"),
+        "vol_down": _c(r"(?:turn|put)?\s*down.{0,12}volume|volume\s+down"
+                       r"|(?:lower|decrease|reduce)\s.{0,8}volume|turn\s+it\s+down"
+                       r"|quieter|softer"),
+        # Loose on purpose (mirrors the Italian style) and gated by is_play in
+        # handle(), so "play What Is This Feeling" stays a play command. Also
+        # covers the apostrophe-less ASR form "whats playing".
+        "nowplaying": _c(r"\bwhat'?s?\b.{0,10}(?:playing|song|this\b)"
+                         r"|now\s+playing|who\s+(?:is\s+this|sings)"),
         "choose_number": _c(r"(?:play|choose|pick|put\s+on)?\s*(?:the\s+)?number\s+([a-z0-9]+)\s*$"),
-        "choose_article": _c(r"(?:play|choose|pick|put\s+on)?\s*the\s+([a-z0-9]+)\s*$"),
+        # "the 2" and ordinals: "the second", "play the second one/song"
+        "choose_article": _c(r"(?:play|choose|pick|put\s+on)?\s*the\s+([a-z0-9]+)"
+                             r"(?:\s+(?:one|song|track|option))?\s*$"),
         "local_prefix": _c(rf"{_EN_LOCAL}\s+(?:play\s+|put\s+on\s+)?(.+)$"),
         "local_suffix": _c(rf"(?:play|put\s+on|start)\s+(.+?)\s+{_EN_LOCAL}\s*$"),
         "service": r"(?:from {s}|on {s}|with {s})\s+(?:play\s+|put\s+on\s+)?(.+)$",
         "albums_list": _c(r"(?:which|what).{0,12}albums?.{0,16}(?:by|of|from)\s+(.+)$"),
-        "toptracks": _c(r"(?:top\s+tracks|most\s+(?:played|listened)|which\s+songs).*?(?:by|of|from)\s+(.+)$"),
+        "toptracks": _c(r"(?:top\s+tracks|best\s+(?:songs|tracks)|most\s+(?:played|listened)"
+                        r"|which\s+songs).*?(?:by|of|from)\s+(.+)$"),
         "name_pick": _c(r"(?:(?:i\s+want\s+to\s+(?:hear|listen\s+to)|play|choose|pick|put\s+on|start)\s+)?(.+)$"),
-        "album": _c(r"(?:play|put\s+on|start)\s+the\s+album\s+(.+)$"),
-        "playlist": _c(r"(?:play|put\s+on|start)\s+the\s+playlist\s+(.+)$"),
+        "album": _c(r"(?:play|put\s+on|start)\s+(?:the\s+)?album\s+(.+)$"),
+        "playlist": _c(r"(?:play|put\s+on|start)\s+(?:the\s+)?playlist\s+(.+)$"),
         "artist": _c(r"(?:play|put\s+on|start)\s+"
-                     r"(?:(?:some\s+|the\s+)?music\s+(?:by|of|from)|the\s+artist|songs\s+by)\s+(.+)$"),
-        "generic_play": _c(r"(?:play|put\s+on|start|i\s+want\s+to\s+(?:hear|listen\s+to))\s+(.+)$"),
+                     r"(?:(?:some\s+|the\s+)?music\s+(?:by|of|from)|something\s+by"
+                     r"|the\s+artist|songs?\s+by)\s+(.+)$"),
+        "generic_play": _c(r"(?:play|put\s+on|start|listen\s+to"
+                           r"|i\s+want\s+to\s+(?:hear|listen\s+to))\s+(.+)$"),
+        # Suffix form: "put Dark Side of the Moon on"
+        "generic_play_suffix": _c(r"^put\s+(.+?)\s+on\s*$"),
     },
 }
 
@@ -216,7 +254,8 @@ class Router:
         # 1) transport & info (source-independent)
         if P["pause_explicit"].search(t) or (not is_play and P["pause"].search(t)):
             return actions.pause(self.lms)
-        if not is_play and P["resume"].search(t):
+        # Bare "play" is a resume even though "play" is also a play verb.
+        if P["resume_explicit"].match(t) or (not is_play and P["resume"].search(t)):
             return actions.resume(self.lms)
         if not is_play and P["next"].search(t):
             return actions.next_track(self.lms)
@@ -226,7 +265,8 @@ class Router:
             return actions.change_volume(self.lms, "up")
         if P["vol_down"].search(t):
             return actions.change_volume(self.lms, "down")
-        if P["nowplaying"].search(t):
+        # Gated by is_play so a title like "What Is This Feeling" still plays.
+        if not is_play and P["nowplaying"].search(t):
             return actions.now_playing(self.lms)
 
         # 2) choose from the last read-out list by position. Accepts a digit or a
@@ -235,10 +275,10 @@ class Router:
         # open list (helpful hint); a bare numeral only counts as a pick while a
         # list is open, so it can't swallow an unrelated one-word command.
         m = P["choose_number"].match(t) or P["choose_article"].match(t)
-        number = _as_number(m.group(1)) if m else None
+        number = _as_number(m.group(1), ordinals=bool(self.candidates)) if m else None
         if number is None and self.candidates:
             bare = re.match(r"([a-z0-9]+)\s*$", t, re.I)
-            number = _as_number(bare.group(1)) if bare else None
+            number = _as_number(bare.group(1), ordinals=True) if bare else None
         if number is not None:
             return actions.choose_from(self.lms, self.candidates, number)
 
@@ -297,6 +337,8 @@ class Router:
 
         # 8) generic play — streaming or local per selector
         m = P["generic_play"].search(t)
+        if not m and "generic_play_suffix" in P:  # EN: "put Dark Side on"
+            m = P["generic_play_suffix"].match(t)
         if m:
             return self._resolve(m.group(1).strip(), actions.play_song, source)
 

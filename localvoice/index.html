@@ -48,46 +48,46 @@
 </style>
 </head>
 <body>
-  <h1>🎵 Impianto — comando vocale locale</h1>
+  <h1 data-i18n="h1">🎵 Impianto — comando vocale locale</h1>
   <button id="mic" title="Tieni premuto o clicca e parla">🎙️</button>
   <div id="status" class="hint">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
-  <div class="hint">Cerca da solo nella <b>tua libreria</b> e in <b>streaming</b>.
+  <div class="hint" data-i18n="hint_sources">Cerca da solo nella <b>tua libreria</b> e in <b>streaming</b>.
     Per forzare la sorgente: «<i>dalla mia musica</i> …», «<i>da tidal</i> …» o
     «<i>da qobuz</i> …».</div>
   <div class="row">
     <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off">
-    <button class="send" id="send">Invia</button>
+    <button class="send" id="send" data-i18n="send">Invia</button>
   </div>
   <div class="opts">
-    <label class="hint"><input type="checkbox" id="autosend"> invia subito dopo il microfono (mani libere)</label>
-    <label class="vrow hint" style="width:100%">Lingua che parlo al microfono
+    <label class="hint"><input type="checkbox" id="autosend"> <span data-i18n="autosend">invia subito dopo il microfono (mani libere)</span></label>
+    <label class="vrow hint" style="width:100%"><span data-i18n="lbl_reclang">Lingua che parlo al microfono</span>
       <select id="reclang"></select></label>
-    <label class="vrow hint" style="width:100%">Sorgente musica
+    <label class="vrow hint" style="width:100%"><span data-i18n="lbl_source">Sorgente musica</span>
       <select id="source"></select></label>
-    <label class="hint"><input type="checkbox" id="wakemode"> attiva a voce con una parola chiave
+    <label class="hint"><input type="checkbox" id="wakemode"> <span data-i18n="wakemode_lbl">attiva a voce con una parola chiave</span>
       <input id="wakeword" type="text" value="impianto" autocomplete="off"></label>
-    <div id="wakehint" class="hint" style="display:none; text-align:left">Ascolto continuo: il microfono
+    <div id="wakehint" class="hint" style="display:none; text-align:left" data-i18n="wakehint">Ascolto continuo: il microfono
       resta attivo e l'audio passa dal riconoscimento vocale del browser. Poi tocca il microfono una
       volta e di' «<b><span id="wwlabel">impianto</span></b> …» seguito dal comando.
       <span class="warn">Su Android il browser emette un suono a ogni riattivazione dell'ascolto
       (ogni pochi secondi), e non si può togliere da qui: sul telefono conviene lasciare questa
       opzione spenta e usare il microfono a tocco (un suono solo per comando). La parola chiave dà
       il meglio su PC/tablet con Chrome.</span></div>
-    <label class="hint"><input type="checkbox" id="readback"> 🔊 leggi la risposta ad alta voce</label>
+    <label class="hint"><input type="checkbox" id="readback"> <span data-i18n="readback_lbl">🔊 leggi la risposta ad alta voce</span></label>
   </div>
   <details class="hint" id="voicepanel" style="max-width:480px; display:none">
-    <summary>Voci &amp; lingue</summary>
+    <summary data-i18n="voices_summary">Voci &amp; lingue</summary>
     <div id="voiceSettings" class="vset"></div>
-    <label class="vrow">Lingua predefinita dei titoli stranieri
+    <label class="vrow"><span data-i18n="lbl_foreign">Lingua predefinita dei titoli stranieri</span>
       <select id="foreign"></select></label>
-    <button class="send" id="testvoice" type="button" style="margin-top:.4rem">Prova le voci</button>
-    <div class="hint" style="margin-top:.3rem">La cornice italiana («Riproduco…») è letta in italiano;
+    <button class="send" id="testvoice" type="button" style="margin-top:.4rem" data-i18n="testvoice">Prova le voci</button>
+    <div class="hint" style="margin-top:.3rem" data-i18n="voices_hint">La cornice italiana («Riproduco…») è letta in italiano;
       il titolo e l'artista nella loro lingua. Le voci disponibili dipendono dal dispositivo.</div>
   </details>
   <div id="log"></div>
   <details class="hint" style="max-width:480px">
-    <summary>Cosa posso dire</summary>
-    <ul style="text-align:left; padding-left:1.2rem; margin:.4rem 0">
+    <summary data-i18n="say_summary">Cosa posso dire</summary>
+    <ul style="text-align:left; padding-left:1.2rem; margin:.4rem 0" data-i18n="say_list">
       <li>«riproduci Comfortably Numb dei Pink Floyd»</li>
       <li>«metti l'album The Wall» · «metti la musica di Aerosmith»</li>
       <li>«quali album ho di Yes» → «metti la 2» (o «metti Fragile»)</li>
@@ -95,11 +95,11 @@
       <li>«pausa» · «riprendi» · «prossima» · «alza il volume» · «cosa sta suonando»</li>
     </ul>
   </details>
-  <div class="hint">Suggerimento: se un <b>nome inglese</b> viene capito male (es. «Audioslave» →
+  <div class="hint" data-i18n="tip_names">Suggerimento: se un <b>nome inglese</b> viene capito male (es. «Audioslave» →
     «audio slave»), correggilo nella casella e premi Invia.</div>
   <details class="hint" id="installpanel" style="max-width:480px">
-    <summary>📱 Installa come app (senza avvisi del certificato)</summary>
-    <ol style="text-align:left; padding-left:1.2rem; margin:.4rem 0">
+    <summary data-i18n="install_summary">📱 Installa come app (senza avvisi del certificato)</summary>
+    <ol style="text-align:left; padding-left:1.2rem; margin:.4rem 0" data-i18n="install_steps">
       <li>Scarica la CA locale: <a id="calink" href="/ca.pem">ca.pem</a> (una volta sola per dispositivo).</li>
       <li><b>Android</b>: Impostazioni → Sicurezza → Altro / Crittografia e credenziali →
         Installa un certificato → <b>Certificato CA</b> → scegli il file scaricato.<br>
@@ -111,11 +111,11 @@
         scegli <b>Installa app</b> / <b>Aggiungi a schermata Home</b>: si apre a tutto schermo
         come un'app vera.</li>
     </ol>
-    <div>La CA è generata in casa tua e firma solo questo server: non dà a nessun altro
+    <div data-i18n="install_ca_note">La CA è generata in casa tua e firma solo questo server: non dà a nessun altro
       la possibilità di intercettare il tuo traffico.</div>
   </details>
-  <a class="hint" id="material" href="__MATERIAL_URL__" target="_blank" rel="noopener">
-    Vuoi vedere coda, copertine e sfogliare? Apri Material Skin ↗</a>
+  <a class="hint" id="material" href="__MATERIAL_URL__" target="_blank" rel="noopener"
+     data-i18n="material_link">Vuoi vedere coda, copertine e sfogliare? Apri Material Skin ↗</a>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -184,6 +184,126 @@ function chosenVoice(lang) {
 }
 const recLang = () => localStorage.getItem("reclang") || "it";
 const foreignDefault = () => localStorage.getItem("foreign_default") || "en";
+
+// --- UI language. The Italian labels live in the markup (snapshotted below);
+// UI_EN holds the English versions. The page language follows the mic-language
+// selector: Italian stays Italian, every other speech language gets English.
+const UI_EN = {
+  h1: "🎵 Hi-fi — local voice control",
+  hint_sources: 'It searches <b>your library</b> and <b>streaming</b> on its own. ' +
+    'To force a source: “<i>from my music</i> …”, “<i>on tidal</i> …” or “<i>on qobuz</i> …”.',
+  send: "Send",
+  autosend: "send right after the mic (hands-free)",
+  lbl_reclang: "Language I speak to the mic",
+  lbl_source: "Music source",
+  wakemode_lbl: "voice-activate with a keyword",
+  wakehint: 'Continuous listening: the microphone stays on and the audio goes through ' +
+    'the browser’s speech recognition. Tap the mic once, then say ' +
+    '“<b><span id="wwlabel">impianto</span></b> …” followed by the command. ' +
+    '<span class="warn">On Android the browser plays a sound every time listening restarts ' +
+    '(every few seconds) and it cannot be silenced from here: on phones, leave this off and ' +
+    'use tap-to-talk (one sound per command). The keyword works best on PC/tablet with ' +
+    'Chrome.</span>',
+  readback_lbl: "🔊 read the reply aloud",
+  voices_summary: "Voices &amp; languages",
+  lbl_foreign: "Default language for foreign titles",
+  testvoice: "Test the voices",
+  voices_hint: "The reply frame (“Playing …”) is read in your language; the " +
+    "title and artist in theirs. Available voices depend on the device.",
+  say_summary: "What can I say",
+  say_list: "<li>“play Comfortably Numb by Pink Floyd”</li>" +
+    "<li>“play the album The Wall” · “play music by Aerosmith”</li>" +
+    "<li>“which albums do I have by Yes” → “play number 2” (or “play Fragile”)</li>" +
+    "<li>“from my music play …” · “on tidal play …” · “on qobuz play …”</li>" +
+    "<li>“pause” · “resume” · “next” · “volume up” · “what's playing”</li>",
+  tip_names: "Tip: if a name is <b>misheard</b>, fix it in the box and press Send.",
+  install_summary: "📱 Install as an app (no certificate warnings)",
+  install_steps: '<li>Download the local CA: <a id="calink" href="/ca.pem">ca.pem</a> (once per device).</li>' +
+    "<li><b>Android</b>: Settings → Security → More / Encryption &amp; credentials → " +
+    "Install a certificate → <b>CA certificate</b> → pick the downloaded file.<br>" +
+    "<b>iPhone/iPad</b>: open the file → Settings → Downloaded profile → Install; then " +
+    "Settings → General → About → Certificate Trust Settings → enable trust.<br>" +
+    "<b>PC</b>: double-click ca.pem → install into “Trusted Root Certification Authorities” " +
+    "(Windows) or the Keychain (macOS).</li>" +
+    "<li>Reopen this page: green padlock, no more warnings. Now from the browser menu choose " +
+    "<b>Install app</b> / <b>Add to Home Screen</b>: it opens full-screen like a real app.</li>",
+  install_ca_note: "The CA is generated in your home and signs only this server: it doesn't " +
+    "give anyone else a way to intercept your traffic.",
+  material_link: "Want to browse queue and covers? Open Material Skin ↗",
+  // dynamic strings used from JS
+  ph_text: "e.g. play Time by Pink Floyd",
+  mic_title: "Tap and speak",
+  title_page: "Hi-fi — local voice",
+  status_tap_write: "Tap the microphone and speak, or type below.",
+  src_auto: "Automatic: library, then streaming",
+  src_local: "My library only",
+  src_only: "Only ",
+  net_error: "Network error talking to the local server.",
+  no_mic: "This browser doesn't support the microphone. Use the text box, or open in Chrome/Edge.",
+  need_https: "The microphone needs HTTPS when opened from another device. Start the server " +
+    "with a certificate (see README) or use the text box.",
+  check_text: "Check the text (watch out for names) and press Send.",
+  listening: "Listening…",
+  listening_wake: (w) => "Listening… say “" + w + " …”",
+  say_command: "Yes? Tell me the command…",
+  tap_mic: "Tap the microphone and speak.",
+  mic_error: "Microphone error: ",
+};
+// Italian counterparts of the dynamic strings (the labels come from the markup).
+const UI_IT = {
+  ph_text: "es. riproduci Time dei Pink Floyd",
+  mic_title: "Tieni premuto o clicca e parla",
+  title_page: "Impianto — voce locale",
+  status_tap_write: "Tocca il microfono e parla, oppure scrivi qui sotto.",
+  src_auto: "Automatica: libreria, poi streaming",
+  src_local: "Solo la mia libreria",
+  src_only: "Solo ",
+  net_error: "Errore di rete verso il server locale.",
+  no_mic: "Questo browser non supporta il microfono. Usa la casella di testo, oppure apri con Chrome/Edge.",
+  need_https: "Il microfono richiede HTTPS quando apri da un altro dispositivo. Avvia il " +
+    "server con un certificato (vedi README) oppure usa la casella di testo.",
+  check_text: "Controlla il testo (occhio ai nomi inglesi) e premi Invia.",
+  listening: "Ascolto…",
+  listening_wake: (w) => "In ascolto… di' «" + w + " …»",
+  say_command: "Sì? Dimmi il comando…",
+  tap_mic: "Tocca il microfono e parla.",
+  mic_error: "Errore microfono: ",
+};
+const IT_MARKUP = {};  // Italian innerHTML of every [data-i18n], snapshotted at load
+document.querySelectorAll("[data-i18n]").forEach((el) => {
+  IT_MARKUP[el.dataset.i18n] = el.innerHTML;
+});
+const uiLang = () => (recLang() === "it" ? "it" : "en");
+const ui = (key) => (uiLang() === "it" ? UI_IT : UI_EN)[key];
+
+// The base state of the status line, re-rendered on language change. The mic
+// handlers overwrite it with transient text; that's fine until the next render.
+let statusBase = "default";  // "default" | "nomic" | "nohttps"
+function refreshStatus() {
+  if (statusBase === "nomic" || statusBase === "nohttps") {
+    statusEl.innerHTML = '<span class="warn">' +
+      ui(statusBase === "nomic" ? "no_mic" : "need_https") + "</span>";
+  } else {
+    statusEl.textContent = ui("status_tap_write");
+  }
+}
+
+function applyUI() {
+  const en = uiLang() === "en";
+  document.documentElement.lang = en ? "en" : "it";
+  document.title = ui("title_page");
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const k = el.dataset.i18n;
+    el.innerHTML = (en && UI_EN[k] !== undefined) ? UI_EN[k] : IT_MARKUP[k];
+  });
+  $("text").placeholder = ui("ph_text");
+  $("mic").title = ui("mic_title");
+  // wakehint embeds the wake-word span: restore its live value after the swap
+  const ww = $("wwlabel");
+  if (ww) ww.textContent = ($("wakeword").value || "impianto").trim();
+  buildSourceOptions();
+  refreshStatus();
+}
 
 // Guess a term's language; proper nouns usually have no signal -> foreign default.
 function detectLang(text) {
@@ -270,7 +390,7 @@ function buildVoicePickers() {
   const rl = $("reclang"), fd = $("foreign");
   if (rl && !rl.dataset.done) {
     rl.innerHTML = opts; rl.value = recLang(); rl.dataset.done = "1";
-    rl.onchange = () => localStorage.setItem("reclang", rl.value);
+    rl.onchange = () => { localStorage.setItem("reclang", rl.value); applyUI(); };
   }
   if (fd && !fd.dataset.done) {
     // foreign default excludes Italian (the frame is always Italian)
@@ -323,17 +443,17 @@ $("wakeword").oninput = () => {
 // available on the LMS, so e.g. Qobuz only shows up when its plugin is there.
 const SERVICES = __SERVICES__;
 const SERVICE_NAMES = { tidal: "TIDAL", qobuz: "Qobuz" };
-(function initSource() {
+function buildSourceOptions() {
   const sel = $("source");
-  const opts = [["auto", "Automatica: libreria, poi streaming"],
-                ["local", "Solo la mia libreria"]]
-    .concat(SERVICES.map(s => [s, "Solo " + (SERVICE_NAMES[s] || s)]));
+  const cur = sel.value || localStorage.getItem("source") || "auto";
+  const opts = [["auto", ui("src_auto")], ["local", ui("src_local")]]
+    .concat(SERVICES.map(s => [s, ui("src_only") + (SERVICE_NAMES[s] || s)]));
   sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join("");
-  const saved = localStorage.getItem("source") || "auto";
   // A saved service that is no longer offered falls back to auto.
-  sel.value = opts.some(([v]) => v === saved) ? saved : "auto";
+  sel.value = opts.some(([v]) => v === cur) ? cur : "auto";
   sel.onchange = () => localStorage.setItem("source", sel.value);
-})();
+}
+buildSourceOptions();
 const currentSource = () => $("source").value || "auto";
 
 async function send(text, alternatives) {
@@ -360,7 +480,7 @@ async function send(text, alternatives) {
     if (Array.isArray(data.choices) && data.choices.length) renderChoices(b, data.choices);
     if (readbackOn()) speak(data.speech, data.terms);
   } catch (e) {
-    bubble("Errore di rete verso il server locale.", "sys warn");
+    bubble(ui("net_error"), "sys warn");
   }
 }
 
@@ -373,12 +493,10 @@ $("text").addEventListener("keydown", (e) => {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const mic = $("mic");
 if (!SR) {
-  statusEl.innerHTML = '<span class="warn">Questo browser non supporta il microfono.' +
-    ' Usa la casella di testo, oppure apri con Chrome/Edge.</span>';
+  statusBase = "nomic";
 } else if (!window.isSecureContext && location.hostname !== "localhost"
            && location.hostname !== "127.0.0.1") {
-  statusEl.innerHTML = '<span class="warn">Il microfono richiede HTTPS quando apri da un altro' +
-    ' dispositivo. Avvia il server con un certificato (vedi README) oppure usa la casella di testo.</span>';
+  statusBase = "nohttps";
 } else {
   const rec = new SR();
   rec.maxAlternatives = 5;  // hands-free: the server tries these in order
@@ -458,7 +576,7 @@ if (!SR) {
   function handleManualFinal(txt, alts) {
     $("text").value = txt;
     if ($("autosend").checked) { runCommand(txt, alts); }
-    else { statusEl.textContent = "Controlla il testo (occhio ai nomi inglesi) e premi Invia."; $("text").focus(); }
+    else { statusEl.textContent = ui("check_text"); $("text").focus(); }
   }
   // Wake mode is CONTINUOUS: the recogniser finalises a long phrase in pieces,
   // so acting on each piece would fire half-typed commands ("metti Don't",
@@ -486,11 +604,11 @@ if (!SR) {
     // command is sent, so silence stays silent.
     const after = commandAfterWake(txt);        // null when the wake word isn't present
     if (after === null) {
-      statusEl.textContent = "In ascolto… di' «" + wakeWord() + " …»";
+      statusEl.textContent = ui("listening_wake")(wakeWord());
       return;
     }
     const cmd = after.trim();
-    if (!cmd) { statusEl.textContent = "Sì? Dimmi il comando…"; return; }  // just the wake word
+    if (!cmd) { statusEl.textContent = ui("say_command"); return; }  // just the wake word
 
     statusEl.textContent = "… " + cmd;
     clearTimeout(capTimer);                     // keep waiting while words keep coming
@@ -509,16 +627,16 @@ if (!SR) {
   };
   rec.onstart = () => {
     active = true; mic.classList.add("listening");
-    statusEl.textContent = mode === "wake" ? ("In ascolto… di' «" + wakeWord() + " …»") : "Ascolto…";
+    statusEl.textContent = mode === "wake" ? ui("listening_wake")(wakeWord()) : ui("listening");
   };
   rec.onend = () => {
     active = false; mic.classList.remove("listening");
     if (mode === "wake") {  // keep listening (mobile/Chrome auto-stop after a pause)
       setTimeout(() => { if (mode === "wake" && !active) { try { rec.start(); } catch (e) {} } }, 350);
-    } else { mode = "off"; statusEl.textContent = "Tocca il microfono e parla."; }
+    } else { mode = "off"; statusEl.textContent = ui("tap_mic"); }
   };
   rec.onerror = (e) => {
-    statusEl.textContent = "Errore microfono: " + e.error;
+    statusEl.textContent = ui("mic_error") + e.error;
     // A denied/blocked mic would otherwise restart-loop in wake mode: turn it off.
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       mode = "off"; $("wakemode").checked = false; $("wakehint").style.display = "none";
@@ -548,6 +666,9 @@ if (!SR) {
     if (on) startWake(); else stopAll();
   };
 }
+
+// Render the UI in the selected language (labels, source options, status line).
+applyUI();
 
 // PWA: registra il service worker (shell offline + installabilità). Chrome lo
 // accetta solo su HTTPS *fidato* — cioè con la CA locale installata (vedi il

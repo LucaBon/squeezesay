@@ -467,3 +467,39 @@ def test_unknown_source_uses_default_service(router, transport, make_feed):
     )
     assert router.handle("riproduci Time", source="deezer") == "Riproduco Time."
     assert ["playlist", "play", "tidal://9.flc"] in transport.commands()
+
+
+# -- scelte con ordinali (solo a lista aperta) ------------------------------
+def _open_local_list(router, transport):
+    transport.responses["albums"] = {"count": 0}
+    transport.responses["artists"] = {"count": 0}
+    transport.responses["titles"] = {
+        "titles_loop": [
+            {"id": 1, "title": "Love", "artist": "Kendrick Lamar"},
+            {"id": 2, "title": "Love", "artist": "Nat King Cole"},
+        ]
+    }
+    router.handle("dalla mia musica metti love")
+
+
+@pytest.mark.parametrize("phrase", ["metti la seconda", "la seconda",
+                                    "metti la seconda canzone", "seconda"])
+def test_choose_ordinal_it(router, transport, phrase):
+    _open_local_list(router, transport)
+    assert router.handle(phrase) == "Riproduco Love."
+    assert ["playlistcontrol", "cmd:load", "track_id:2"] in transport.commands()
+
+
+def test_ordinal_without_list_is_not_a_pick_it(router, transport, make_feed):
+    # Nessuna lista aperta: «metti la quinta» è musica (Beethoven), non una
+    # scelta — deve arrivare alla ricerca, non al suggerimento sull'elenco.
+    transport.responses["albums"] = {"count": 0}
+    transport.responses["artists"] = {"count": 0}
+    transport.responses["titles"] = {"count": 0}
+    transport.responses["tidal"] = make_feed(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://55.flc", "name": "La Quinta"}]},
+    )
+    speech = router.handle("metti la quinta", source="auto")
+    assert "Prima chiedimi un elenco" not in speech
+    assert ["playlist", "play", "tidal://55.flc"] in transport.commands()

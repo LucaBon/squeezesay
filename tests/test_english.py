@@ -172,4 +172,140 @@ def test_languages_do_not_leak_between_requests(router, transport):
 
 
 def test_patterns_cover_both_langs():
-    assert set(PATTERNS["it"]) == set(PATTERNS["en"])
+    # Optional keys are read with ``P.get``/``in P`` in handle(); every other
+    # key is indexed directly, so it must exist in every language.
+    optional = {"generic_play_suffix"}
+    assert set(PATTERNS["it"]) - optional == set(PATTERNS["en"]) - optional
+
+
+# -- field-hardening battery: realistic phrasing variants ---------------------
+def test_bare_play_resumes_en(router, transport):
+    router.handle("play", lang="en")
+    assert transport.last_call()[1] == ["pause", "0"]
+
+
+@pytest.mark.parametrize(
+    "phrase, expected_cmd",
+    [
+        ("raise the volume", ["mixer", "volume", "+5"]),
+        ("increase the volume", ["mixer", "volume", "+5"]),
+        ("crank up the volume", ["mixer", "volume", "+5"]),
+        ("turn it up", ["mixer", "volume", "+5"]),
+        ("volume up", ["mixer", "volume", "+5"]),
+        ("reduce the volume", ["mixer", "volume", "-5"]),
+        ("decrease the volume", ["mixer", "volume", "-5"]),
+        ("turn it down", ["mixer", "volume", "-5"]),
+        ("volume down", ["mixer", "volume", "-5"]),
+        ("softer", ["mixer", "volume", "-5"]),
+        ("skip this song", ["playlist", "index", "+1"]),
+        ("next song please", ["playlist", "index", "+1"]),
+    ],
+)
+def test_transport_variants_en(router, transport, phrase, expected_cmd):
+    router.handle(phrase, lang="en")
+    assert transport.last_call()[1] == expected_cmd
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ["whats playing",          # ASR drops the apostrophe
+     "what song is this",
+     "who is this",
+     "who sings this",
+     "now playing"],
+)
+def test_now_playing_variants_en(router, transport, phrase):
+    transport.responses["status"] = {"playlist_loop": [{"title": "Time", "artist": "PF"}]}
+    assert router.handle(phrase, lang="en") == "Now playing Time by PF."
+
+
+def test_play_title_that_sounds_like_nowplaying_en(router, transport, make_tidal):
+    # "What Is This Feeling" must play, not answer with the current track.
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://8.flc",
+                      "name": "What Is This Feeling"}]},
+    )
+    router.handle("play What Is This Feeling", source="tidal", lang="en")
+    assert ["playlist", "play", "tidal://8.flc"] in transport.commands()
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ["listen to Time",
+     "put on Time",
+     "put Time on",            # suffix form
+     "i want to hear Time"],
+)
+def test_generic_play_variants_en(router, transport, make_tidal, phrase):
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://9.flc", "name": "Time"}]},
+    )
+    router.handle(phrase, source="tidal", lang="en")
+    assert ["playlist", "play", "tidal://9.flc"] in transport.commands()
+
+
+def test_put_suffix_with_transport_word_en(router, transport, make_tidal):
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://5.flc",
+                      "name": "Don't Stop Me Now"}]},
+    )
+    router.handle("put Don't Stop Me Now on", source="tidal", lang="en")
+    assert ["playlist", "play", "tidal://5.flc"] in transport.commands()
+    assert ["pause", "1"] not in transport.commands()
+
+
+def test_album_without_article_en(router, transport, make_tidal):
+    transport.responses["tidal"] = make_tidal(
+        categories={"Albums": "A"},
+        items={"A": [{"id": "alb1", "name": "The Wall", "hasitems": 1}]},
+    )
+    assert router.handle("play album The Wall", source="tidal",
+                         lang="en") == "Playing the album The Wall."
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ["play something by Pink Floyd",
+     "play songs by Pink Floyd",
+     "play music from Pink Floyd"],
+)
+def test_artist_variants_en(router, transport, make_tidal, phrase):
+    transport.responses["tidal"] = make_tidal(
+        categories={"Artists": "Ar"},
+        items={"Ar": [{"id": "a1", "name": "Pink Floyd", "hasitems": 1}],
+               "a1": [{"id": "tt", "name": "Top Tracks", "hasitems": 1}],
+               "tt": [{"isaudio": 1, "url": "tidal://1.flc", "name": "Time"}]},
+    )
+    router.handle(phrase, source="tidal", lang="en")
+    assert ["playlist", "play", "tidal://1.flc"] in transport.commands()
+
+
+# -- ordinal picks (only while a list is open) --------------------------------
+def _open_list_en(router, transport, make_tidal):
+    transport.responses["tidal"] = make_tidal(
+        categories={"Artists": "Ar"},
+        items={"Ar": [{"id": "a1", "name": "Pink Floyd", "hasitems": 1}],
+               "a1": [{"id": "tt", "name": "Top Tracks", "hasitems": 1}],
+               "tt": [{"isaudio": 1, "url": "tidal://1.flc", "name": "Time"},
+                      {"isaudio": 1, "url": "tidal://2.flc", "name": "Money"}]},
+    )
+    router.handle("top tracks by Pink Floyd", source="tidal", lang="en")
+
+
+@pytest.mark.parametrize("phrase", ["the second one", "play the second one",
+                                    "the second song", "second"])
+def test_choose_ordinal_en(router, transport, make_tidal, phrase):
+    _open_list_en(router, transport, make_tidal)
+    assert router.handle(phrase, source="tidal", lang="en") == "Playing Money."
+    assert ["playlist", "play", "tidal://2.flc"] in transport.commands()
+
+
+def test_ordinal_without_list_is_not_a_pick_en(router, transport, make_tidal):
+    # No open list: "play the second one" is a (weird) search, not a pick hint.
+    transport.responses["tidal"] = make_tidal(categories={"Songs": "S"},
+                                              items={"S": []})
+    speech = router.handle("play the second one", source="tidal", lang="en")
+    assert "First ask me for a list" not in speech

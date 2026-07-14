@@ -2,7 +2,7 @@
 
 > Say **«metti Comfortably Numb dei Pink Floyd»** — and the *exact* song plays on your hi-fi.
 
-**Hands-free Italian voice control for a [Daphile](https://www.daphile.com/) /
+**Hands-free voice control — in Italian or English — for a [Daphile](https://www.daphile.com/) /
 [Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) system — TIDAL and
 Qobuz included.**
 No cloud required, no LLM, no compromise on sound: SqueezeSay sends **only control
@@ -77,7 +77,8 @@ uv run python localvoice/server.py          # auto-discovers LMS on the LAN
 # open http://<this-pc-ip>:8730 from a phone/tablet/PC on the same network
 ```
 
-Then say (or type), in Italian:
+Then say (or type), in Italian — or in English, after picking the mic language
+on the page (the whole UI follows):
 
 > «metti Comfortably Numb dei Pink Floyd» · «metti l'album The Wall» ·
 > «dalla mia musica metti Aerosmith» · «da qobuz metti Time» ·
@@ -112,7 +113,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # 286 tests, no network — uses a simulated LMS transport
+uv run pytest        # 353 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS (read-only, or `--play` to actually play):
@@ -125,9 +126,9 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
 ## Honest caveats
 
 - **The voice interface speaks Italian and English.** Web app: pick the mic
-  language on the page (commands are parsed and answered in that language).
-  Alexa: import `interaction-models/en-US.json` for an English skill. Other
-  languages fall back to Italian for now.
+  language on the page — commands are parsed and answered in that language, and
+  the page labels follow it too. Alexa: import `interaction-models/en-US.json`
+  for an English skill. Other languages fall back to Italian for now.
 - **The Alexa path needs an always-on home host + an HTTPS tunnel** (Cloudflare
   Tunnel/ngrok): Alexa runs in the cloud and can't reach your LMS otherwise. The
   **local web app needs none of that.**
