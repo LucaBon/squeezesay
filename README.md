@@ -86,11 +86,12 @@ Then say (or type), in Italian:
 
 > [!NOTE]
 > The browser microphone needs **HTTPS** when used from another device — the Docker
-> image sets this up automatically (self-signed cert, generated once into a volume);
+> image sets this up automatically (certificate generated once into a volume);
 > without Docker, start the server with a certificate (`--cert/--key`, auto-generated
-> by the helper scripts). The **text box works everywhere**, even plain HTTP. Full
-> setup — Docker, HTTPS, autostart on Windows/Linux, and the Alexa skill — is in
-> **[DEPLOY.md](DEPLOY.md)**.
+> by the helper scripts). Install the generated **local CA** once per phone (page
+> panel *"📱 Installa come app"*) for a green lock and a real **installable PWA**.
+> The **text box works everywhere**, even plain HTTP. Full setup — Docker, HTTPS,
+> autostart on Windows/Linux, and the Alexa skill — is in **[DEPLOY.md](DEPLOY.md)**.
 
 There's a link to Material Skin right in the page for when you want to browse visually.
 
