@@ -1,0 +1,24 @@
+# Tutto ciò che non deve finire nell'immagine Docker: segreti locali,
+# artefatti di build e file che non servono a runtime.
+.git/
+.venv/
+venv/
+build/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+tests/
+skill.zip
+uv.lock
+
+# Segreti / config locale: la configurazione del container passa SOLO per
+# variabili d'ambiente (vedi docker-compose.yml), mai per file copiati.
+*.pem
+*.env
+lambda/config.py
+config.py
+
+# Dipendenze Alexa eventualmente scompattate in lambda/ (vedi .gitignore)
+lambda/ask_sdk*/
+lambda/certifi/
+lambda/*.dist-info/

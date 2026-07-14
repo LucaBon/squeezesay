@@ -1,58 +1,69 @@
-# SqueezeSay
+# 🎵 SqueezeSay
 
-**Hands-free voice control for a [Daphile](https://www.daphile.com/) /
-[Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) hi-fi — including TIDAL — in Italian.**
+> Say **«metti Comfortably Numb dei Pink Floyd»** — and the *exact* song plays on your hi-fi.
 
-SqueezeSay is a small, deterministic voice layer for an LMS setup. It sends **only
-control commands**; the audio still flows LMS → Squeezelite → your DAC, so hi-res
-quality is untouched. It's a **companion** to the excellent visual apps for this
-ecosystem — it deliberately does **not** reinvent browsing, queue, or now-playing:
+**Hands-free Italian voice control for a [Daphile](https://www.daphile.com/) /
+[Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) system — TIDAL included.**
+No cloud required, no LLM, no compromise on sound: SqueezeSay sends **only control
+commands**, while the audio keeps flowing LMS → Squeezelite → your DAC, bit-perfect.
 
-- Use **[Material Skin](https://github.com/CDrummond/lms-material)** (web) or
-  **[Squeezer](https://f-droid.org/en/packages/uk.org.ngo.squeezer/)** (Android) to
-  *see* and touch — browse, queue, artwork, multi-room.
-- Use **SqueezeSay** to *speak* — the one thing those don't do well hands-free.
+```text
+You:  «impianto, metti Comfortably Numb dei Pink Floyd»
+App:  «Riproduco Comfortably Numb di Pink Floyd.»
+
+You:  «metti Love»
+App:  «Quale intendi? 1: Love di Lana Del Rey, 2: Love di John Lennon, 3: …»
+You:  «la 2»            ← or just tap the "2" button on screen
+App:  «Riproduco Love di John Lennon.»
+```
+
+## The idea
+
+Great visual apps for this ecosystem already exist — SqueezeSay deliberately does
+**not** reinvent browsing, queueing, or now-playing. It's a **companion**:
+
+- 👀 **See & touch** with **[Material Skin](https://github.com/CDrummond/lms-material)**
+  (web) or **[Squeezer](https://f-droid.org/en/packages/uk.org.ngo.squeezer/)** (Android)
+  — browse, queue, artwork, multi-room.
+- 🗣️ **Speak** with **SqueezeSay** — the one thing those don't do well hands-free.
 
 Two front-ends share one tested engine (`lambda/actions.py` + `lambda/lms.py`):
 
-1. **Local web app** (`localvoice/`) — **recommended.** No cloud, no account, no cost.
-   A browser mic/text page on your LAN that talks straight to LMS.
-2. **Alexa skill** (`lambda/`) — a private, unpublished custom skill for your Echo.
+1. 🏠 **Local web app** (`localvoice/`) — **recommended.** No cloud, no account, no
+   cost. A browser mic/text page on your LAN that talks straight to LMS.
+2. 🔵 **Alexa skill** (`lambda/`) — a private, unpublished custom skill for your Echo.
 
-## What makes it reliable
+## Why it doesn't play the wrong song
 
-The whole point is: *say a song and the exact song plays* — or you get an honest
-question, never a silent wrong pick.
+The whole point: *say a song and the exact song plays* — or you get an honest
+question, **never a silent wrong pick**. Matching is deterministic (rules + scoring,
+no LLM), so behaviour is testable and repeatable.
 
-- **Title / artist / album understanding.** "metti Comfortably Numb **dei** Pink Floyd"
-  is parsed into title + artist; "… **dall'album** X" into an album.
-- **Artist-aware ranking.** TIDAL results are read in *menu mode*, which carries the
-  **artist**, so among three "Comfortably Numb" it plays *Pink Floyd's* edition and
-  confirms *"Riproduco Comfortably Numb di Pink Floyd."*
-- **"Did you mean" (top 3).** When several genuinely different songs match, it reads
-  back the top three ("1: Love di X, 2: Love di Y") and you answer "metti la 2" — on
-  both the web app and Alexa. On the **web app** those choices also appear as
-  **tappable buttons**, so you can just tap "2" instead of speaking. Exact matches just
-  play; junk never wins.
-- **Local library is scored too** — a generic word like "love" never plays an
-  unrelated album, and "aerosmith" plays the *artist*, not a random album.
-- **Mishearing resilience.** The web app tries the browser's alternative
-  transcriptions until one hits (English names it-IT often mangles).
-- **Hands-free wake word (web app).** Optionally arm a spoken keyword ("impianto" by
-  default) so you start a command without touching the screen — say «impianto metti Time».
-  Off by default; the mic otherwise stays tap-to-talk.
-- **Natural multilingual read-back — optional, off by default.** The on-screen transcript
-  already shows the reply, so the app is silent unless you tick "leggi la risposta ad alta
-  voce". When on, the Italian frame is spoken in an Italian voice and the title/artist in
-  *their* language (English/Spanish/French/German) using the best natural voice your
-  browser offers — pick voices in the app's settings.
-- **Optional kid-safe filter** (Alexa only) — a voice-editable blocklist gated by Alexa
-  Voice ID.
+| | |
+|---|---|
+| 🧠 **Title / artist / album parsing** | "metti Comfortably Numb **dei** Pink Floyd" → title + artist; "… **dall'album** X" → album. |
+| 🎯 **Artist-aware ranking** | TIDAL results are read in *menu mode*, which carries the **artist** — so among three "Comfortably Numb" it plays *Pink Floyd's* edition and confirms it out loud. |
+| ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — on both front-ends. On the web app the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
+| 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
+| 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
+| 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("impianto" by default): «impianto metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
+| 🌍 **Natural multilingual read-back** | Optional, off by default (the transcript is on screen). When on, the Italian frame is spoken by an Italian voice and the title/artist in *their* language (English/Spanish/French/German), with the best natural voices your browser offers — pickable in settings. |
+| 🧒 **Kid-safe filter (Alexa only)** | A voice-editable blocklist gated by Alexa Voice ID. |
 
-## Quick start — local web app (recommended)
+## Quick start — local web app
 
-Prereqs: Python ≥ 3.9, [uv](https://docs.astral.sh/uv/), an LMS/Daphile on the LAN with
-the TIDAL plugin installed and logged in, and at least one active player.
+Prereqs: an LMS/Daphile on the LAN with the TIDAL plugin installed and logged in,
+and at least one active player.
+
+**With Docker** (Linux / NAS / Raspberry Pi — easiest, HTTPS included):
+
+```bash
+docker compose up -d
+# open https://<this-host-ip>:8730 from a phone/tablet/PC on the same network
+# (accept the self-signed certificate warning once — the mic then works)
+```
+
+**Without Docker** (Python ≥ 3.9 + [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 uv sync
@@ -60,14 +71,19 @@ uv run python localvoice/server.py          # auto-discovers LMS on the LAN
 # open http://<this-pc-ip>:8730 from a phone/tablet/PC on the same network
 ```
 
-Say or type, in Italian: «metti Comfortably Numb dei Pink Floyd» · «metti l'album The
-Wall» · «dalla mia musica metti Aerosmith» · «quali album ho di Yes» → «metti la 2» ·
-«pausa» · «alza il volume» · «cosa sta suonando».
+Then say (or type), in Italian:
 
-> The browser microphone needs **HTTPS** from another device — start with a certificate
-> (`--cert/--key`, auto-generated by the helper scripts). The **text box works
-> everywhere**. Full setup — HTTPS, autostart on Windows/Linux, and the Alexa skill — is
-> in **[DEPLOY.md](DEPLOY.md)**.
+> «metti Comfortably Numb dei Pink Floyd» · «metti l'album The Wall» ·
+> «dalla mia musica metti Aerosmith» · «quali album ho di Yes» → «metti la 2» ·
+> «pausa» · «alza il volume» · «cosa sta suonando»
+
+> [!NOTE]
+> The browser microphone needs **HTTPS** when used from another device — the Docker
+> image sets this up automatically (self-signed cert, generated once into a volume);
+> without Docker, start the server with a certificate (`--cert/--key`, auto-generated
+> by the helper scripts). The **text box works everywhere**, even plain HTTP. Full
+> setup — Docker, HTTPS, autostart on Windows/Linux, and the Alexa skill — is in
+> **[DEPLOY.md](DEPLOY.md)**.
 
 There's a link to Material Skin right in the page for when you want to browse visually.
 
@@ -88,7 +104,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # ~257 tests, no network — uses a simulated LMS transport
+uv run pytest        # 258 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS+TIDAL (read-only, or `--play` to actually play):
@@ -99,10 +115,13 @@ uv run python tools/probe_lms.py --query "Comfortably Numb dei Pink Floyd"
 
 ## Honest caveats
 
-- **Voice interface is Italian only** (it-IT interaction model + Italian responses).
+- **The voice interface is Italian only** (it-IT interaction model + Italian responses).
 - **The Alexa path needs an always-on home host + an HTTPS tunnel** (Cloudflare
   Tunnel/ngrok): Alexa runs in the cloud and can't reach your LMS otherwise. The
   **local web app needs none of that.**
+- **Wake-word mode on Android beeps**: the browser plays its own earcon every time
+  continuous listening restarts — a platform behaviour SqueezeSay can't silence
+  (the app warns about it in-page).
 - TIDAL free-text search quality depends on the plugin; matching is deterministic (no
   LLM). Natural TTS voices depend on your device/browser.
 - Bit-perfect: SqueezeSay sends **only commands**; ensure LMS doesn't resample to the player.

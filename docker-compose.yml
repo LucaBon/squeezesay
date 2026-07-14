@@ -1,0 +1,37 @@
+# SqueezeSay — web app vocale locale. Avvio in un comando:
+#
+#   docker compose up -d
+#
+# Poi apri https://<ip-di-questo-host>:8730 dal telefono (stessa rete) e
+# accetta una volta l'avviso del certificato self-signed.
+#
+# Con `network_mode: host` (Linux/NAS/Raspberry Pi) funzionano sia
+# l'auto-discovery UDP di LMS sia il certificato con gli IP giusti nei SAN,
+# quindi di norma NON serve configurare nulla.
+services:
+  squeezesay:
+    build: .
+    container_name: squeezesay
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - squeezesay-data:/data   # certificato TLS persistente (accetti l'avviso una volta sola)
+    environment:
+      SQUEEZESAY_PORT: "8730"
+      # Tutte opzionali — decommenta solo ciò che ti serve:
+      # SQUEEZESAY_LMS: "http://192.168.1.50:9000"   # se omesso: auto-discovery sulla LAN
+      # SQUEEZESAY_PLAYER: "aa:bb:cc:dd:ee:ff"       # se omesso: il primo player trovato
+      # SQUEEZESAY_MATERIAL_URL: "http://192.168.1.50:9000/material/"
+      # SQUEEZESAY_HTTPS: "0"                        # solo HTTP: mic solo su localhost
+      # SQUEEZESAY_CERT_HOSTS: "192.168.1.20"        # SAN extra nel certificato (vedi sotto)
+
+    # --- Docker Desktop (Windows/Mac) o reti bridge ---------------------------
+    # `network_mode: host` lì non espone davvero la LAN: commentalo, decommenta
+    # `ports`, e imposta esplicitamente SQUEEZESAY_LMS (l'auto-discovery UDP non
+    # attraversa il bridge) e SQUEEZESAY_CERT_HOSTS con l'IP LAN dell'host (il
+    # container vede solo il proprio IP interno, non quello che userà il telefono).
+    # ports:
+    #   - "8730:8730"
+
+volumes:
+  squeezesay-data:

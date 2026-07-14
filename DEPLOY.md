@@ -15,6 +15,37 @@ the address at all.
 
 Runs on your LAN and talks straight to LMS: no Amazon, no AWS, no tunnel, zero cost.
 
+### A0. Docker — one command, HTTPS included (Linux / NAS / Raspberry Pi)
+
+```bash
+docker compose up -d
+# open https://<ip-of-this-host>:8730 and accept the certificate warning once
+```
+
+That's it: LMS is auto-discovered on the LAN, the TLS certificate is generated on
+first start into a persistent volume (so the browser warning is one-time), and the
+container restarts on boot (`restart: unless-stopped` — no systemd/autostart needed).
+Everything is configured via environment variables in
+[docker-compose.yml](docker-compose.yml), all optional:
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `SQUEEZESAY_LMS` | LMS URL, e.g. `http://192.168.1.50:9000` | auto-discovery (UDP) |
+| `SQUEEZESAY_PLAYER` | player MAC | first player found |
+| `SQUEEZESAY_PORT` | listen port | `8730` |
+| `SQUEEZESAY_HTTPS` | `0` = plain HTTP (mic on localhost only) | `1` |
+| `SQUEEZESAY_CERT_HOSTS` | extra SANs for the certificate (comma-separated) | — |
+| `SQUEEZESAY_MATERIAL_URL` | URL for the "Material Skin" link | `<lms>/material/` |
+
+> [!NOTE]
+> The compose file uses `network_mode: host`, which is what makes auto-discovery and
+> the certificate "just work" — it requires Linux (fine on NAS/Raspberry Pi). On
+> **Docker Desktop (Windows/Mac)** or bridge networks, follow the comments in
+> [docker-compose.yml](docker-compose.yml): map the port, set `SQUEEZESAY_LMS`
+> explicitly, and put the host's LAN IP in `SQUEEZESAY_CERT_HOSTS`.
+
+### A1. Without Docker
+
 ```bash
 uv sync
 uv run python localvoice/server.py            # auto-discovers LMS on the LAN
@@ -39,6 +70,8 @@ The **text box works everywhere**, even over HTTP.
 
 ### Autostart
 
+- **Docker:** nothing to do — `restart: unless-stopped` in the compose file already
+  restarts the container on boot and on failure.
 - **Windows:** `tools/run_local.ps1` (starts HTTPS, generates the cert if missing) and
   `tools/install_autostart.ps1` (scheduled task at logon + firewall rule; run **as
   Administrator**). `tools/uninstall_autostart.ps1` removes it.
