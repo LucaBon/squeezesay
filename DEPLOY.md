@@ -44,6 +44,20 @@ Everything is configured via environment variables in
 > [docker-compose.yml](docker-compose.yml): map the port, set `SQUEEZESAY_LMS`
 > explicitly, and put the host's LAN IP in `SQUEEZESAY_CERT_HOSTS`.
 
+### A0-bis. Home Assistant add-on
+
+If you run Home Assistant OS/Supervised, SqueezeSay installs as an add-on
+(same engine, wrapped for the Supervisor — see [ha-addon/](ha-addon/)):
+
+1. **Settings → Add-ons → Add-on store → ⋮ → Repositories** → add
+   `https://github.com/LucaBon/squeezesay`.
+2. Install **SqueezeSay** and start it. LMS is auto-discovered; the options
+   (all optional: `lms_url`, `player`, `port`, `https`, `cert_hosts`,
+   `material_url`) mirror the Docker environment variables above.
+3. Open `https://<home-assistant-ip>:8730` and accept the certificate warning
+   once. Full details in the add-on's Documentation tab
+   ([ha-addon/DOCS.md](ha-addon/DOCS.md)).
+
 ### A1. Without Docker
 
 ```bash

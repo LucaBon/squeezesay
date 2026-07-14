@@ -34,4 +34,7 @@ fi
 [ -n "${SQUEEZESAY_MATERIAL_URL:-}" ] && set -- "$@" --material-url "$SQUEEZESAY_MATERIAL_URL"
 
 # exec: python diventa PID 1, così docker stop arriva pulito al server.
-exec python /app/localvoice/server.py "$@"
+# -u: stdout non bufferizzato anche dove le ENV non arrivano al processo
+# (es. sotto s6-overlay nell'add-on Home Assistant) — senza, `docker logs`
+# non mostrerebbe la riga "Pronto: https://..." finché il processo è vivo.
+exec python -u /app/localvoice/server.py "$@"

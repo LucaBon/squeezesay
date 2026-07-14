@@ -1,0 +1,6 @@
+# Rende questo repo installabile come "add-on repository" di Home Assistant:
+# Impostazioni → Componenti aggiuntivi → Store → ⋮ → Repository →
+#   https://github.com/LucaBon/squeezesay
+name: SqueezeSay Add-ons
+url: https://github.com/LucaBon/squeezesay
+maintainer: Luca Bonura

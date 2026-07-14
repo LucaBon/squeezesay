@@ -1,0 +1,26 @@
+# Add-on Home Assistant per la web app vocale locale di SqueezeSay.
+#
+# host_network: serve sia all'auto-discovery UDP di LMS sia ad avere gli IP
+# LAN giusti nei SAN del certificato self-signed (il microfono del browser
+# richiede HTTPS da altri dispositivi).
+name: SqueezeSay
+version: "0.1.0"
+slug: squeezesay
+description: Controllo vocale in italiano per LMS/Squeezebox/Daphile, TIDAL incluso
+url: https://github.com/LucaBon/squeezesay
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
+host_network: true
+options:
+  https: true
+  port: 8730
+schema:
+  https: bool
+  port: port
+  lms_url: str?
+  player: str?
+  cert_hosts: str?
+  material_url: str?

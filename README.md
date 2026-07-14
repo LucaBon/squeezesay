@@ -63,6 +63,10 @@ docker compose up -d
 # (accept the self-signed certificate warning once — the mic then works)
 ```
 
+**As a Home Assistant add-on**: add this repo's URL under *Settings → Add-ons →
+Add-on store → ⋮ → Repositories*, then install **SqueezeSay** — see
+[DEPLOY.md](DEPLOY.md).
+
 **Without Docker** (Python ≥ 3.9 + [uv](https://docs.astral.sh/uv/)):
 
 ```bash
