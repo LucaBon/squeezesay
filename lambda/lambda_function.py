@@ -23,6 +23,7 @@ from ask_sdk_core.utils import is_intent_name, is_request_type
 import actions
 import blocklist_store
 from lms import LMSClient
+from messages import msg
 
 
 # Config comes from environment variables (own-Lambda deploy) or, as a fallback,
@@ -135,13 +136,9 @@ class LaunchRequestHandler(AbstractRequestHandler):
         person_id = _person_id(handler_input)
         if person_id:
             print(f"[personalization] personId={person_id}")
-        speech = (
-            "Impianto pronto. Puoi dire, ad esempio: riproduci Comfortably Numb dei "
-            "Pink Floyd; metti l'album The Wall; metti la musica di Aerosmith; oppure "
-            "metti in pausa. Cosa ascoltiamo?"
-        )
+        speech = msg("launch")
         if person_id and not _cfg("TRUSTED_PERSON_ID"):
-            speech += " Personalizzazione non ancora configurata."
+            speech += msg("launch_no_personalization")
         return _respond(handler_input, speech, end=False)
 
 
@@ -367,14 +364,7 @@ class HelpHandler(AbstractRequestHandler):
         return is_intent_name("AMAZON.HelpIntent")(handler_input)
 
     def handle(self, handler_input):
-        return _respond(
-            handler_input,
-            "Posso riprodurre un brano, un album, un artista o una playlist, in streaming "
-            "o dalla tua musica. Prova: riproduci Time dei Pink Floyd; metti l'album The "
-            "Wall; quali album ho di Yes, poi metti la due. Posso anche mettere in pausa, "
-            "cambiare traccia e regolare il volume. Cosa vuoi ascoltare?",
-            end=False,
-        )
+        return _respond(handler_input, msg("help"), end=False)
 
 
 class FallbackHandler(AbstractRequestHandler):
@@ -382,11 +372,7 @@ class FallbackHandler(AbstractRequestHandler):
         return is_intent_name("AMAZON.FallbackIntent")(handler_input)
 
     def handle(self, handler_input):
-        return _respond(
-            handler_input,
-            "Non ho capito. Prova a dire: riproduci, oppure metti la musica di.",
-            end=False,
-        )
+        return _respond(handler_input, msg("alexa_fallback"), end=False)
 
 
 class SessionEndedHandler(AbstractRequestHandler):
@@ -402,10 +388,7 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
         return True
 
     def handle(self, handler_input, exception):
-        return _respond(
-            handler_input,
-            "Si è verificato un problema con l'impianto. Riprova tra poco.",
-        )
+        return _respond(handler_input, msg("alexa_error"))
 
 
 sb = SkillBuilder()

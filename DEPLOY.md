@@ -153,7 +153,8 @@ You get an `https://….trycloudflare.com` URL → that's your `LMS_BASE_URL`. *
    hosting **Alexa-hosted (Python)** → language **Italiano (IT)**.
 2. **Build → JSON Editor**: paste `interaction-models/it-IT.json` → **Build Model**.
 3. **Code** tab: replace the contents with our `lambda_function.py`, `actions.py`,
-   `lms.py`; put `ask-sdk-core` in `requirements.txt`. Create a **`config.py`**
+   `lms.py`, `messages.py`, `blocklist_store.py`; put `ask-sdk-core` in
+   `requirements.txt`. Create a **`config.py`**
    (see `lambda/config.example.py`) with `LMS_BASE_URL` (the tunnel URL) and
    `LMS_PLAYER_ID` (optional: `MUSIC_SERVICE = "qobuz"` to stream from Qobuz
    instead of TIDAL). **Save** → **Deploy**.

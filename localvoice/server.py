@@ -31,6 +31,7 @@ sys.path.insert(0, HERE)  # router
 
 import discovery  # noqa: E402
 from lms import SERVICES, LMSClient  # noqa: E402
+from messages import msg  # noqa: E402
 from router import Router  # noqa: E402
 
 INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
@@ -120,7 +121,7 @@ def make_handler(lms, material_url: str, services, default_service: str):
             try:
                 result = router_for(client_id).handle_many(alternatives, source)
             except Exception as exc:  # never 500 the client
-                result = {"speech": f"Errore interno: {exc}", "used": text,
+                result = {"speech": msg("internal_error", error=exc), "used": text,
                           "ok": False, "error": str(exc), "terms": []}
             self._send(200, json.dumps(result, ensure_ascii=False))
 

@@ -2,9 +2,10 @@
 
 Each function takes an :class:`lms.LMSClient` (or any object with the same
 methods) plus already-extracted slot values, performs the LMS/TIDAL operation,
-and returns an **Italian** speech string. All LMS failures are turned into a
-friendly message instead of raising, so the skill never crashes on a network
-hiccup.
+and returns a speech string. The wording lives in the ``messages`` catalog
+(referenced by key — see :mod:`messages` for the i18n plan); today the only
+catalog is Italian. All LMS failures are turned into a friendly message
+instead of raising, so the skill never crashes on a network hiccup.
 """
 
 from __future__ import annotations
@@ -16,8 +17,9 @@ from typing import Dict, List, Optional
 
 from blocklist_store import BlocklistStoreError
 from lms import LMSError
+from messages import msg
 
-ERR_UNREACHABLE = "Non riesco a contattare l'impianto in questo momento. Riprova tra poco."
+ERR_UNREACHABLE = msg("err_unreachable")
 VOLUME_STEP = 5
 LIST_LIMIT = 5
 
@@ -107,9 +109,9 @@ LOCAL_CONFIDENT = CONFIDENT_SCORE  # a local match must clearly fit the query to
 
 def _label(cand: Dict) -> str:
     """'Title di Artist' for a candidate, else just the title."""
-    title = cand.get("title") or "brano"
+    title = cand.get("title") or msg("generic_track")
     artist = cand.get("artist")
-    return f"{title} di {artist}" if artist else title
+    return msg("label_title_artist", title=title, artist=artist) if artist else title
 
 
 def _dedup_by_title_artist(cands: List[Dict]) -> List[Dict]:
@@ -135,14 +137,16 @@ def _did_you_mean(query: Optional[str], cands: List[Dict]) -> ActionResult:
     '1: Title di Artist, ...'. ``cands`` are choose_from-ready (TIDAL {title,url}
     or local {title,action,arg}); callers pass an already blocked-filtered list."""
     picks = cands[:DIDYOUMEAN_LIMIT]
-    listing = ", ".join(f"{i + 1}: {_label(c)}" for i, c in enumerate(picks))
+    listing = ", ".join(
+        msg("enum_item", n=i + 1, name=_label(c)) for i, c in enumerate(picks)
+    )
     terms = []
     for c in picks:
         if c.get("title"):
             terms.append(c["title"])
         if c.get("artist"):
             terms.append(c["artist"])
-    speech = f"Ne ho diversi per {query}. {listing}. Quale metto?"
+    speech = msg("didyoumean", query=query, listing=listing)
     return ActionResult(speech, ok=True, candidates=picks, kind="disambiguate", terms=terms)
 
 
@@ -156,11 +160,9 @@ def _play_tidal_track(lms, track: Dict, fallback_title: Optional[str], *, guard:
 
 
 # Spoken when a restricted (non-owner) speaker asks for a blocked song/singer.
-BLOCKED_SPEECH = (
-    "Questa canzone c'è, ma non è adatta alla tua età, quindi non posso metterla."
-)
+BLOCKED_SPEECH = msg("blocked")
 # Spoken when a non-owner tries to change the blocklist by voice.
-NOT_OWNER_SPEECH = "Solo il genitore può cambiare la lista dei brani bloccati."
+NOT_OWNER_SPEECH = msg("not_owner")
 
 
 def _normalize(text: Optional[str]) -> str:
@@ -261,7 +263,7 @@ def play_song(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> Ac
     parsed = parse_song_query(query)
     title, artist, album = parsed["title"], parsed["artist"], parsed["album"]
     if not title and not album:
-        return ActionResult("Non ho capito il titolo. Puoi ripetere?", ok=False)
+        return ActionResult(msg("ask_title"), ok=False)
     if guard and guard.blocks(title, artist, album):
         return ActionResult(BLOCKED_SPEECH, ok=False)
     try:
@@ -272,7 +274,7 @@ def play_song(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> Ac
         search_text = " ".join(p for p in (title, artist) if p) or title
         tracks = lms.search_tracks(search_text)
         if not tracks:
-            return ActionResult(f"Non ho trovato nessun brano per {title}.", ok=False)
+            return ActionResult(msg("no_track_found", title=title), ok=False)
         return _resolve_song(lms, tracks, title, artist, guard=guard)
     except LMSError:
         return ActionResult(ERR_UNREACHABLE, ok=False)
@@ -302,7 +304,7 @@ def _resolve_song(lms, tracks, title, artist, *, guard=None) -> ActionResult:
     if guard and guard.restricted:
         head = [t for t in head if not is_blocked(t.get("title"), guard.blocklist)]
     if not head:
-        return ActionResult(f"Non ho trovato nessun brano per {title}.", ok=False)
+        return ActionResult(msg("no_track_found", title=title), ok=False)
     if _ndistinct_titles(head) < 2:
         return _play_tidal_track(lms, head[0], title, guard=guard)
     return _did_you_mean(title, _dedup_by_title_artist(head))
@@ -324,8 +326,8 @@ def _confirm_song(lms, track: Dict, fallback_title: Optional[str]):
         if now and _normalize(now.get("title")) == _normalize(name):
             artist = now.get("artist")
     if artist:
-        return f"Riproduco {name} di {artist}.", [name, artist]
-    return f"Riproduco {name}.", [name]
+        return msg("playing_by", name=name, artist=artist), [name, artist]
+    return msg("playing", name=name), [name]
 
 
 def _play_from_album(
@@ -333,7 +335,7 @@ def _play_from_album(
 ) -> ActionResult:
     result = lms.album_tracks(album)
     if not result["album"]:
-        return ActionResult(f"Non ho trovato l'album {album}.", ok=False)
+        return ActionResult(msg("album_not_found", album=album), ok=False)
     album_name = result["album"]["title"] or album
     if guard and guard.blocks(album_name):
         return ActionResult(BLOCKED_SPEECH, ok=False)
@@ -345,29 +347,31 @@ def _play_from_album(
                 return ActionResult(BLOCKED_SPEECH, ok=False)
             lms.play_url(track["url"])
             return ActionResult(
-                f"Riproduco {track['title']} dall'album {album_name}.",
+                msg("playing_track_from_album", title=track["title"], album=album_name),
                 ok=True, terms=[track["title"], album_name],
             )
         # title not found in that album -> play the whole album instead
         lms.play_browse_item(result["album"]["id"])
         return ActionResult(
-            f"Non ho trovato {title} nell'album {album_name}; riproduco l'album.",
+            msg("track_not_in_album", title=title, album=album_name),
             ok=True, terms=[title, album_name],
         )
     lms.play_browse_item(result["album"]["id"])
-    return ActionResult(f"Riproduco l'album {album_name}.", ok=True, terms=[album_name])
+    return ActionResult(
+        msg("playing_album", album=album_name), ok=True, terms=[album_name]
+    )
 
 
 def play_album(lms, album: Optional[str], *, guard: Optional[Guard] = None) -> ActionResult:
     album = (album or "").strip()
     if not album:
-        return ActionResult("Non ho capito quale album. Puoi ripetere?", ok=False)
+        return ActionResult(msg("ask_album"), ok=False)
     if guard and guard.blocks(album):
         return ActionResult(BLOCKED_SPEECH, ok=False)
     try:
         cands = lms.album_candidates(album)
         if not cands:
-            return ActionResult(f"Non ho trovato l'album {album}.", ok=False)
+            return ActionResult(msg("album_not_found", album=album), ok=False)
         item = _rank(album, cands)[0][1]  # best title match, not blindly the first
         if guard and guard.blocks(item.get("title")):
             return ActionResult(BLOCKED_SPEECH, ok=False)
@@ -375,47 +379,47 @@ def play_album(lms, album: Optional[str], *, guard: Optional[Guard] = None) -> A
     except LMSError:
         return ActionResult(ERR_UNREACHABLE, ok=False)
     name = item["title"] or album
-    return ActionResult(f"Riproduco l'album {name}.", ok=True, terms=[name])
+    return ActionResult(msg("playing_album", album=name), ok=True, terms=[name])
 
 
 def play_artist(lms, artist: Optional[str], *, guard: Optional[Guard] = None) -> ActionResult:
     artist = (artist or "").strip()
     if not artist:
-        return ActionResult("Non ho capito l'artista. Puoi ripetere?", ok=False)
+        return ActionResult(msg("ask_artist"), ok=False)
     if guard and guard.blocks(artist):
         return ActionResult(BLOCKED_SPEECH, ok=False)
     try:
         result = lms.artist_top_tracks(artist)
         if not result["artist"]:
-            return ActionResult(f"Non ho trovato l'artista {artist}.", ok=False)
+            return ActionResult(msg("artist_not_found", artist=artist), ok=False)
         if guard and guard.blocks(result["artist"].get("title")):
             return ActionResult(BLOCKED_SPEECH, ok=False)
         tracks = result["tracks"]
         if not tracks:
-            return ActionResult(f"Non riesco a riprodurre l'artista {artist}.", ok=False)
+            return ActionResult(msg("artist_unplayable", artist=artist), ok=False)
         lms.play_tracks([t["url"] for t in tracks])
     except LMSError:
         return ActionResult(ERR_UNREACHABLE, ok=False)
-    return ActionResult(f"Riproduco la musica di {artist}.", ok=True, terms=[artist])
+    return ActionResult(msg("playing_artist", artist=artist), ok=True, terms=[artist])
 
 
 def play_playlist(lms, name: Optional[str], *, guard: Optional[Guard] = None) -> ActionResult:
     name = (name or "").strip()
     if not name:
-        return ActionResult("Non ho capito quale playlist. Puoi ripetere?", ok=False)
+        return ActionResult(msg("ask_playlist"), ok=False)
     if guard and guard.blocks(name):
         return ActionResult(BLOCKED_SPEECH, ok=False)
     try:
         cands = lms.playlist_candidates(name)
         if not cands:
-            return ActionResult(f"Non ho trovato la playlist {name}.", ok=False)
+            return ActionResult(msg("playlist_not_found", name=name), ok=False)
         item = _rank(name, cands)[0][1]
         if guard and guard.blocks(item.get("title")):
             return ActionResult(BLOCKED_SPEECH, ok=False)
         lms.play_browse_item(item["id"])
     except LMSError:
         return ActionResult(ERR_UNREACHABLE, ok=False)
-    return ActionResult(f"Riproduco la playlist {name}.", ok=True, terms=[name])
+    return ActionResult(msg("playing_playlist", name=name), ok=True, terms=[name])
 
 
 def pause(lms) -> str:
@@ -423,7 +427,7 @@ def pause(lms) -> str:
         lms.pause()
     except LMSError:
         return ERR_UNREACHABLE
-    return "In pausa."
+    return msg("paused")
 
 
 def resume(lms) -> str:
@@ -431,7 +435,7 @@ def resume(lms) -> str:
         lms.resume()
     except LMSError:
         return ERR_UNREACHABLE
-    return "Riprendo la riproduzione."
+    return msg("resumed")
 
 
 def next_track(lms) -> str:
@@ -439,7 +443,7 @@ def next_track(lms) -> str:
         lms.next_track()
     except LMSError:
         return ERR_UNREACHABLE
-    return "Brano successivo."
+    return msg("next_track")
 
 
 def previous_track(lms) -> str:
@@ -447,7 +451,7 @@ def previous_track(lms) -> str:
         lms.previous_track()
     except LMSError:
         return ERR_UNREACHABLE
-    return "Brano precedente."
+    return msg("previous_track")
 
 
 def change_volume(lms, direction: str) -> str:
@@ -458,7 +462,7 @@ def change_volume(lms, direction: str) -> str:
         lms.volume(delta)
     except LMSError:
         return ERR_UNREACHABLE
-    return "Volume alzato." if direction == "up" else "Volume abbassato."
+    return msg("volume_up") if direction == "up" else msg("volume_down")
 
 
 def now_playing(lms) -> str:
@@ -467,12 +471,15 @@ def now_playing(lms) -> str:
     except LMSError:
         return ERR_UNREACHABLE
     if not info or not info.get("title"):
-        return ActionResult("Al momento non sta suonando niente.", ok=True)
+        return ActionResult(msg("nothing_playing"), ok=True)
     title = info.get("title")
     artist = info.get("artist")
     if artist:
-        return ActionResult(f"Sta suonando {title} di {artist}.", ok=True, terms=[title, artist])
-    return ActionResult(f"Sta suonando {title}.", ok=True, terms=[title])
+        return ActionResult(
+            msg("now_playing_by", title=title, artist=artist),
+            ok=True, terms=[title, artist],
+        )
+    return ActionResult(msg("now_playing", title=title), ok=True, terms=[title])
 
 
 # -- conversational flow: list -> choose by number ------------------------
@@ -483,7 +490,7 @@ def top_tracks_list(
     stores ``candidates`` (title+url) in session for a follow-up choice."""
     artist = (artist or "").strip()
     if not artist:
-        return {"speech": "Di quale artista?", "candidates": []}
+        return {"speech": msg("which_artist"), "candidates": []}
     if guard and guard.blocks(artist):
         return {"speech": BLOCKED_SPEECH, "candidates": []}
     try:
@@ -494,9 +501,11 @@ def top_tracks_list(
         tracks = [t for t in tracks if not is_blocked(t.get("title"), guard.blocklist)]
     tracks = tracks[:limit]
     if not tracks:
-        return {"speech": f"Non ho trovato brani per {artist}.", "candidates": []}
-    listing = ", ".join(f"{i + 1}: {t['title']}" for i, t in enumerate(tracks))
-    speech = f"Ecco i brani più ascoltati di {artist}. {listing}. Quale metto?"
+        return {"speech": msg("no_tracks_for", artist=artist), "candidates": []}
+    listing = ", ".join(
+        msg("enum_item", n=i + 1, name=t["title"]) for i, t in enumerate(tracks)
+    )
+    speech = msg("top_tracks", artist=artist, listing=listing)
     candidates = [{"title": t["title"], "url": t["url"]} for t in tracks]
     return {"speech": speech, "candidates": candidates}
 
@@ -525,9 +534,9 @@ def choose_from(
 ) -> str:
     """Play the N-th candidate from a previously read-out list."""
     if not candidates:
-        return "Prima chiedimi un elenco, ad esempio: quali sono i brani di Pink Floyd."
+        return msg("no_open_list")
     if number is None or number < 1 or number > len(candidates):
-        return f"Scegli un numero da 1 a {len(candidates)}."
+        return msg("pick_range", n=len(candidates))
     chosen = candidates[number - 1]
     if guard and guard.blocks(chosen.get("title")):
         return BLOCKED_SPEECH
@@ -535,7 +544,7 @@ def choose_from(
         _dispatch_play(lms, chosen)
     except LMSError:
         return ERR_UNREACHABLE
-    return f"Riproduco {chosen['title']}."
+    return msg("playing", name=chosen["title"])
 
 
 def choose_by_name(
@@ -577,7 +586,7 @@ def choose_by_name(
         _dispatch_play(lms, chosen)
     except LMSError:
         return ERR_UNREACHABLE
-    return f"Riproduco {chosen['title']}."
+    return msg("playing", name=chosen["title"])
 
 
 # -- local library (Music Folder / USB) -----------------------------------
@@ -607,7 +616,7 @@ def play_local(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> A
     'Love di X, Love di Y')."""
     query = _strip_lead_filler(query)
     if not query:
-        return ActionResult("Non ho capito cosa mettere. Puoi ripetere?", ok=False)
+        return ActionResult(msg("ask_query"), ok=False)
     if guard and guard.blocks(query):
         return ActionResult(BLOCKED_SPEECH, ok=False)
     try:
@@ -619,7 +628,7 @@ def play_local(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> A
             ) if g
         ]
         if not groups:
-            return ActionResult(f"Non ho trovato {query} nella tua musica.", ok=False)
+            return ActionResult(msg("local_not_found", query=query), ok=False)
         groups.sort(key=lambda g: -g[0][0])  # best-scoring category wins
         winner = [cand for _s, cand in groups[0]]
         distinct = _dedup_by_title_artist(winner)
@@ -628,9 +637,9 @@ def play_local(lms, query: Optional[str], *, guard: Optional[Guard] = None) -> A
         item = distinct[0]
         _dispatch_play(lms, item)
         speech = (
-            f"Riproduco l'album {item['title']} dalla tua musica."
+            msg("playing_local_album", title=item["title"])
             if item["_kind"] == "album"
-            else f"Riproduco {item['title']} dalla tua musica."
+            else msg("playing_local", title=item["title"])
         )
         return ActionResult(speech, ok=True, terms=[item["title"]])
     except LMSError:
@@ -644,7 +653,7 @@ def local_albums_list(
     candidate plays that album by id when chosen."""
     artist = (artist or "").strip()
     if not artist:
-        return {"speech": "Di quale artista?", "candidates": []}
+        return {"speech": msg("which_artist"), "candidates": []}
     if guard and guard.blocks(artist):
         return {"speech": BLOCKED_SPEECH, "candidates": []}
     try:
@@ -652,15 +661,17 @@ def local_albums_list(
     except LMSError:
         return {"speech": ERR_UNREACHABLE, "candidates": []}
     if not result["artist"]:
-        return {"speech": f"Non ho {artist} nella tua musica.", "candidates": []}
+        return {"speech": msg("local_no_artist", artist=artist), "candidates": []}
     albums = result["albums"]
     if guard and guard.restricted:  # drop blocked albums so they can't be chosen
         albums = [a for a in albums if not is_blocked(a.get("title"), guard.blocklist)]
     albums = albums[:limit]
     if not albums:
-        return {"speech": f"Non ho trovato album di {artist}.", "candidates": []}
-    listing = ", ".join(f"{i + 1}: {a['title']}" for i, a in enumerate(albums))
-    speech = f"Di {result['artist']['title']} ho: {listing}. Quale metto?"
+        return {"speech": msg("local_no_albums", artist=artist), "candidates": []}
+    listing = ", ".join(
+        msg("enum_item", n=i + 1, name=a["title"]) for i, a in enumerate(albums)
+    )
+    speech = msg("local_albums", artist=result["artist"]["title"], listing=listing)
     candidates = [
         {"title": a["title"], "action": "play_album_id", "arg": a["id"]} for a in albums
     ]
@@ -676,15 +687,15 @@ def add_block(store, term: Optional[str], *, is_owner: bool) -> str:
         return NOT_OWNER_SPEECH
     term = (term or "").strip()
     if not term:
-        return "Non ho capito cosa bloccare. Puoi ripetere?"
+        return msg("ask_block")
     try:
         terms = store.get()
         if any(_normalize(t) == _normalize(term) for t in terms):
-            return f"{term} è già nella lista dei brani bloccati."
+            return msg("already_blocked", term=term)
         store.put(terms + [term])
     except BlocklistStoreError:
-        return "Non riesco a salvare la lista in questo momento. Riprova tra poco."
-    return f"Ok, ho bloccato {term}."
+        return msg("blocklist_save_error")
+    return msg("block_added", term=term)
 
 
 def remove_block(store, term: Optional[str], *, is_owner: bool) -> str:
@@ -693,16 +704,16 @@ def remove_block(store, term: Optional[str], *, is_owner: bool) -> str:
         return NOT_OWNER_SPEECH
     term = (term or "").strip()
     if not term:
-        return "Non ho capito cosa sbloccare. Puoi ripetere?"
+        return msg("ask_unblock")
     try:
         terms = store.get()
         kept = [t for t in terms if _normalize(t) != _normalize(term)]
         if len(kept) == len(terms):
-            return f"{term} non è nella lista dei brani bloccati."
+            return msg("not_in_blocklist", term=term)
         store.put(kept)
     except BlocklistStoreError:
-        return "Non riesco ad aggiornare la lista in questo momento. Riprova tra poco."
-    return f"Ok, ho sbloccato {term}."
+        return msg("blocklist_update_error")
+    return msg("block_removed", term=term)
 
 
 def list_blocks(store, *, is_owner: bool) -> str:
@@ -711,5 +722,5 @@ def list_blocks(store, *, is_owner: bool) -> str:
         return NOT_OWNER_SPEECH
     terms = store.get()
     if not terms:
-        return "La lista dei brani bloccati è vuota."
-    return "Brani bloccati: " + ", ".join(terms) + "."
+        return msg("blocklist_empty")
+    return msg("blocklist_listing", terms=", ".join(terms))

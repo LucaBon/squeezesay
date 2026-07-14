@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 
 import actions
+from messages import msg
 
 _LOCAL = r"(?:dalla mia musica|dal disco|in locale|dalla libreria)"
 _TIDAL = r"(?:da tidal|su tidal|con tidal)"
@@ -104,7 +105,7 @@ class Router:
         (the primary one if none matched)."""
         alts = [a for a in (alternatives or []) if (a or "").strip()]
         if not alts:
-            return {"speech": "Non ho sentito niente.", "used": "", "ok": False,
+            return {"speech": msg("heard_nothing"), "used": "", "ok": False,
                     "terms": [], "choices": []}
         primary = None
         for alt in alts:
@@ -139,7 +140,7 @@ class Router:
         self._opened = False
         t = (text or "").strip()
         if not t:
-            return "Non ho sentito niente."
+            return msg("heard_nothing")
 
         # A play command carries a title after the verb; its transport-sounding
         # words ("Don't Stop Me Now" -> "stop", "Play" -> "play") must NOT be
@@ -258,7 +259,4 @@ class Router:
         if m:
             return self._resolve(m.group(1).strip(), actions.play_song, source)
 
-        return (
-            "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "
-            "oppure quali album ho di."
-        )
+        return msg("router_fallback")

@@ -27,7 +27,10 @@ BUILD_DIR = os.path.join(ROOT, "build")
 OUT_ZIP = os.path.join(ROOT, "skill.zip")
 
 # Only these source modules go in (never config.py / *.example.* / secrets).
-SOURCE_MODULES = ["lambda_function.py", "actions.py", "lms.py"]
+# blocklist_store and messages are imported by actions -> required in the zip.
+SOURCE_MODULES = [
+    "lambda_function.py", "actions.py", "lms.py", "messages.py", "blocklist_store.py",
+]
 EXCLUDE_DIRS = {"__pycache__", "bin"}
 
 
