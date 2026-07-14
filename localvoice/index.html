@@ -340,7 +340,9 @@ async function send(text, alternatives) {
   text = (text || "").trim();
   if (!text) return;
   bubble(text, "you");
-  const body = { text, client: clientId(), source: currentSource() };
+  // lang: the mic-language selector — the server parses the command and
+  // replies in that language (it/en; others fall back to Italian).
+  const body = { text, client: clientId(), source: currentSource(), lang: recLang() };
   if (alternatives && alternatives.length > 1) body.alternatives = alternatives;
   try {
     const r = await fetch("/command", {

@@ -163,8 +163,10 @@ You get an `https://….trycloudflare.com` URL → that's your `LMS_BASE_URL`. *
 
 ### B1. Alexa-hosted (free, NO AWS account) — easiest for Echo
 1. https://developer.amazon.com/alexa/console/ask → **Create Skill** → **Custom** →
-   hosting **Alexa-hosted (Python)** → language **Italiano (IT)**.
-2. **Build → JSON Editor**: paste `interaction-models/it-IT.json` → **Build Model**.
+   hosting **Alexa-hosted (Python)** → language **Italiano (IT)** or
+   **English (US)** — replies follow the skill locale automatically.
+2. **Build → JSON Editor**: paste `interaction-models/it-IT.json` (or
+   `interaction-models/en-US.json` for English) → **Build Model**.
 3. **Code** tab: replace the contents with our `lambda_function.py`, `actions.py`,
    `lms.py`, `messages.py`, `blocklist_store.py`; put `ask-sdk-core` in
    `requirements.txt`. Create a **`config.py`**
