@@ -282,6 +282,8 @@ def test_album_without_article_en(router, transport, make_tidal):
     "phrase",
     ["play something by Pink Floyd",
      "play songs by Pink Floyd",
+     "play all the songs by Pink Floyd",
+     "play tracks by Pink Floyd",
      "play music from Pink Floyd"],
 )
 def test_artist_variants_en(router, transport, make_tidal, phrase):

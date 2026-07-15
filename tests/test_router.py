@@ -123,8 +123,9 @@ def test_list_local_albums_then_choose(router, transport):
     listing = router.handle("quali album ho di Yes")
     assert "1: 90125" in listing
     assert router.candidates is not None
-    # follow-up choice uses the remembered list; the pick says the source too
-    assert router.handle("metti la 2") == "Riproduco Fragile dalla tua musica."
+    # follow-up choice uses the remembered list; the pick says the source too.
+    # Dictated with a final period: it must still count as a pick.
+    assert router.handle("Metti la 2.") == "Riproduco Fragile dalla tua musica."
     assert ["playlistcontrol", "cmd:load", "album_id:9"] in transport.commands()
 
 
@@ -292,6 +293,10 @@ def test_explicit_local_overrides_tidal_source(router, transport):
         "riproduci musica degli Audioslave",
         "metti la musica dei Pink Floyd",
         "metti le canzoni di Pink Floyd",
+        "metti canzoni dei Negrita",
+        "metti tutte le canzoni dei Negrita",
+        "riproduci i brani di Battisti",
+        "Metti le canzoni dei Negrita.",  # dictation adds final punctuation
     ],
 )
 def test_artist_grammar_variants(router, transport, make_tidal, phrase):
@@ -305,6 +310,20 @@ def test_artist_grammar_variants(router, transport, make_tidal, phrase):
     )
     assert router.handle(phrase).startswith("Riproduco la musica di ")
     assert ["playlist", "play", "tidal://1.flc"] in transport.commands()
+
+
+def test_singular_canzone_is_a_song_not_an_artist(router, transport, make_tidal):
+    # "la canzone del sole" is a song title (Battisti): the singular must NOT
+    # be read as an artist request for "sole".
+    transport.responses["tidal"] = make_tidal(
+        categories={"Songs": "S"},
+        items={"S": [{"isaudio": 1, "url": "tidal://7.flc",
+                      "name": "La canzone del sole"}]},
+    )
+    assert router.handle("metti la canzone del sole") == (
+        "Riproduco La canzone del sole da TIDAL."
+    )
+    assert ["playlist", "play", "tidal://7.flc"] in transport.commands()
 
 
 # -- multi-alternative ASR (handle_many) ----------------------------------

@@ -94,9 +94,13 @@ PATTERNS = {
         "name_pick": _c(r"(?:(?:voglio\s+ascoltare|fai\s+partire|metti|scegli|riproduci|suona|voglio)\s+)?(.+)$"),
         "album": _c(r"(?:metti|riproduci|fai partire)\s+l['’]?\s*album\s+(.+)$"),
         "playlist": _c(r"(?:metti|riproduci|fai partire)\s+la\s+playlist\s+(.+)$"),
+        # Plural only ("canzoni/brani"): "metti la canzone del sole" is a song
+        # title (Battisti), not an artist request.
         "artist": _c(r"(?:metti|riproduci|fai partire)\s+"
                      r"(?:(?:la\s+)?musica\s+(?:di|dei|degli|delle|del|della|dell['’])"
-                     r"|l['’]?\s*artista|le canzoni di)\s+(.+)$"),
+                     r"|l['’]?\s*artista"
+                     r"|(?:tutte\s+le\s+|le\s+|i\s+)?(?:canzoni|brani)\s+"
+                     r"(?:di|dei|degli|delle|del|della|dell['’]))\s+(.+)$"),
         "generic_play": _c(r"(?:riproduci|metti|suona|fai partire|voglio ascoltare)\s+(.+)$"),
     },
     "en": {
@@ -133,9 +137,11 @@ PATTERNS = {
         "name_pick": _c(r"(?:(?:i\s+want\s+to\s+(?:hear|listen\s+to)|play|choose|pick|put\s+on|start)\s+)?(.+)$"),
         "album": _c(r"(?:play|put\s+on|start)\s+(?:the\s+)?album\s+(.+)$"),
         "playlist": _c(r"(?:play|put\s+on|start)\s+(?:the\s+)?playlist\s+(.+)$"),
+        # Only "by" for songs/tracks: "songs of/from" collide with real titles
+        # ("Songs from the Wood", "Songs of Innocence").
         "artist": _c(r"(?:play|put\s+on|start)\s+"
                      r"(?:(?:some\s+|the\s+)?music\s+(?:by|of|from)|something\s+by"
-                     r"|the\s+artist|songs?\s+by)\s+(.+)$"),
+                     r"|the\s+artist|(?:all\s+)?(?:the\s+)?(?:songs?|tracks?)\s+by)\s+(.+)$"),
         "generic_play": _c(r"(?:play|put\s+on|start|listen\s+to"
                            r"|i\s+want\s+to\s+(?:hear|listen\s+to))\s+(.+)$"),
         # Suffix form: "put Dark Side of the Moon on"
@@ -294,6 +300,10 @@ class Router:
         set_lang(lang)
         P = PATTERNS.get(lang) or PATTERNS["it"]
         t = (text or "").strip()
+        # Dictation often appends final punctuation ("Metti la 2."): it would
+        # break the $-anchored patterns (picks, suffix forms) and leak into the
+        # search terms, so strip it.
+        t = re.sub(r"[.!?…]+$", "", t).strip()
         if not t:
             return msg("heard_nothing")
 
