@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Generate the PWA icons (localvoice/icon-192.png, icon-512.png), stdlib only.
 
-A PNG writer over zlib/struct — no Pillow — drawing the app icon: a white
-eighth note on the app's green, full-bleed (so the same file works both as a
-normal icon and as a maskable one; the note sits inside the central safe zone).
-Icons are deterministic: re-running produces byte-identical files, so they are
-committed and this script only needs to run when the design changes.
+A PNG writer over zlib/struct — no Pillow — drawing the app icon: an amber
+eighth note on the app's hi-fi dark plate, ringed in brand green, full-bleed
+(so the same file works both as a normal icon and as a maskable one; note and
+ring sit inside the central safe zone). Icons are deterministic: re-running
+produces byte-identical files, so they are committed and this script only
+needs to run when the design changes.
 
     uv run python tools/make_icons.py
 """
@@ -19,8 +20,9 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "localvoice")
 
-BG = (45, 125, 70)      # #2d7d46 — the mic/button green of the web app
-FG = (255, 255, 255)
+BG = (14, 19, 17)       # #0e1311 — the app's hi-fi dark background
+FG = (232, 161, 60)     # #e8a13c — the amber VU accent (the note)
+RING = (45, 125, 70)    # #2d7d46 — brand green ring
 SS = 3                  # supersampling factor (cheap antialiasing)
 
 
@@ -43,22 +45,32 @@ def _note_hit(x: float, y: float) -> bool:
     return False
 
 
+def _ring_hit(x: float, y: float) -> bool:
+    """Thin circular ring inside the maskable safe zone (radius <= 0.40)."""
+    r = ((x - 0.5) ** 2 + (y - 0.5) ** 2) ** 0.5
+    return 0.365 <= r <= 0.395
+
+
 def _render(size: int) -> list:
     rows = []
     for py in range(size):
         row = []
         for px in range(size):
-            hits = 0
+            note = ring = 0
             for sy in range(SS):
                 for sx in range(SS):
                     x = (px + (sx + 0.5) / SS) / size
                     y = (py + (sy + 0.5) / SS) / size
                     if _note_hit(x, y):
-                        hits += 1
-            a = hits / (SS * SS)
-            r = round(BG[0] * (1 - a) + FG[0] * a)
-            g = round(BG[1] * (1 - a) + FG[1] * a)
-            b = round(BG[2] * (1 - a) + FG[2] * a)
+                        note += 1
+                    elif _ring_hit(x, y):
+                        ring += 1
+            an = note / (SS * SS)
+            ar = ring / (SS * SS)
+            ab = 1 - an - ar
+            r = round(BG[0] * ab + FG[0] * an + RING[0] * ar)
+            g = round(BG[1] * ab + FG[1] * an + RING[1] * ar)
+            b = round(BG[2] * ab + FG[2] * an + RING[2] * ar)
             row.append((r, g, b, 255))
         rows.append(row)
     return rows

@@ -8,7 +8,7 @@
 // Nota: Chrome registra il service worker solo su HTTPS *fidato* — quindi con
 // la CA locale installata (vedi /ca.pem), non con il certificato "accettato
 // nonostante l'avviso".
-const VERSION = "squeezesay-v1";
+const VERSION = "squeezesay-v3";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {

@@ -1,14 +1,13 @@
 {
-  "name": "SqueezeSay — voce per l'impianto",
+  "name": "SqueezeSay",
   "short_name": "SqueezeSay",
-  "description": "Controllo vocale locale per LMS/Squeezebox: di' un titolo e parte quel brano.",
+  "description": "Local voice control for LMS/Squeezebox — Controllo vocale locale: di' un titolo e parte quel brano.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "lang": "it",
-  "background_color": "#1c1c1e",
-  "theme_color": "#2d7d46",
+  "background_color": "#0e1311",
+  "theme_color": "#0e1311",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
