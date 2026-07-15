@@ -144,6 +144,41 @@ PATTERNS = {
 }
 
 
+# Web Speech rarely transcribes the service names right — they aren't real
+# words, so each recognizer writes what it hears in its own language:
+#   qobuz -> it «kobuz»/«cobus», en "kaboots"/"cabooze", es «cobús»/«cobos»/
+#            «que bus», de «Kobutz»/«Kobuts»/«Kobus», fr «cobusse»/«kobuze»
+#   tidal -> it «taidal»/«tidol», en "title", es «Vidal»/«tídal»,
+#            de «Titel»/«Taidel»/«Tiedal», fr «tidale»/«tidalle»
+# The explicit-source phrase must match what was *heard*, so each service name
+# expands to a sound-alike pattern instead of the literal spelling.
+_SERVICE_SOUNDS = {
+    "tidal": r"(?:t(?:ai|ay|ei|ie|i|í|y)[\s\-]?d[aeoà]?l{1,2}e?"
+             r"|titles?|titel|tider|tida|vidal)",
+    "qobuz": r"(?:[qkc](?:u?[oóa]|ue)[\s\-]?b(?:oo|[uoaúù])[\s\-]?"
+             r"(?:ts|tz|zz|ss|z|s)e?)",
+}
+
+
+def _service_re(name: str) -> str:
+    """Regex snippet matching a service name as ASR may transcribe it."""
+    return _SERVICE_SOUNDS.get(name, re.escape(name))
+
+
+# Display names for the source tag in play confirmations.
+_SERVICE_LABELS = {"tidal": "TIDAL", "qobuz": "Qobuz"}
+
+
+def _source_suffix(name) -> str:
+    """The localized ' da TIDAL' / ' from your music' tag for a source name
+    ('local' or a service), so play replies say which source answered."""
+    if not name:
+        return ""
+    if name == "local":
+        return msg("from_local")
+    return msg("from_service", service=_SERVICE_LABELS.get(name, name))
+
+
 class Router:
     def __init__(self, lms, default_service="tidal", services=("tidal", "qobuz")):
         self.lms = lms
@@ -152,47 +187,64 @@ class Router:
         self.default_service = default_service
         self.services = tuple(services)
         self.candidates = None  # candidates from the last list command
+        # Where those candidates play from ('local' or a service name), so a
+        # follow-up pick's confirmation can say the source too.
+        self.cand_source = None
         # True when THIS turn opened a numbered list (a list command or a
         # 'did you mean'), so the web client can render tappable choice buttons
         # only for the reply that offers them, not on every later reply.
         self._opened = False
 
-    def _stream(self, source):
-        """The LMS client for a streaming request: bound to ``source`` when
-        it names a known service, else to the default streaming service."""
-        name = source if source in self.services else self.default_service
-        return self.lms.for_service(name)
+    def _stream_name(self, source):
+        """The streaming service a request goes to: ``source`` when it names a
+        known service, else the default streaming service."""
+        return source if source in self.services else self.default_service
 
-    def _remember(self, result: dict) -> str:
+    def _stream(self, source):
+        """The LMS client for a streaming request (see :meth:`_stream_name`)."""
+        return self.lms.for_service(self._stream_name(source))
+
+    def _tag(self, res, suffix: str):
+        """Splice the source tag into a play confirmation ('Riproduco Time.' ->
+        'Riproduco Time da Qobuz.'). Only acted-on plays are tagged: misses,
+        errors and 'did you mean' questions pass through untouched."""
+        if not suffix or not getattr(res, "ok", False) or getattr(res, "kind", None):
+            return res
+        speech = (res[:-1] if res.endswith(".") else str(res)) + suffix + "."
+        return actions.ActionResult(speech, ok=True, candidates=res.candidates,
+                                    kind=res.kind, terms=res.terms)
+
+    def _remember(self, result: dict, src=None) -> str:
         self.candidates = result["candidates"] or None
         self._opened = bool(self.candidates)
+        if self.candidates:
+            self.cand_source = src
         return result["speech"]
 
-    def _played(self, result):
-        """Remember any 'did you mean' candidates a play result carried, so a
-        follow-up 'metti la N' / name-pick can choose from them."""
+    def _played(self, result, src=None):
+        """Remember any 'did you mean' candidates a play result carried (and
+        their source), so a follow-up 'metti la N' / name-pick can choose."""
         cands = getattr(result, "candidates", None)
         if cands:
             self.candidates = cands
+            self.cand_source = src
             self._opened = True
         return result
 
-    def _play_auto(self, arg: str, stream_fn, stream):
-        """Auto source: prefer a confident local-library hit, else fall back to
-        the default streaming service (no cascading across services).
-        play_local only plays when it matches, so a miss has no effect."""
-        res = actions.play_local(self.lms, arg)
-        if getattr(res, "ok", False):
-            return res
-        return stream_fn(stream, arg)
-
     def _resolve(self, arg: str, stream_fn, source: str):
         if source == "local":
-            return self._played(actions.play_local(self.lms, arg))
-        stream = self._stream(source)
+            return self._played(actions.play_local(self.lms, arg), "local")
+        name = self._stream_name(source)
+        stream = self.lms.for_service(name)
         if source == "auto":
-            return self._played(self._play_auto(arg, stream_fn, stream))
-        return self._played(stream_fn(stream, arg))
+            # Auto: prefer a confident local-library hit, else fall back to the
+            # default streaming service (no cascading across services).
+            # play_local only plays when it matches, so a miss has no effect.
+            res = actions.play_local(self.lms, arg)
+            if getattr(res, "ok", False):
+                return self._played(res, "local")
+        return self._played(self._tag(stream_fn(stream, arg), _source_suffix(name)),
+                            name)
 
     def handle_many(self, alternatives, source: str = "tidal", lang: str = "it") -> dict:
         """Try each speech-recognition alternative until one is a hit.
@@ -280,31 +332,34 @@ class Router:
             bare = re.match(r"([a-z0-9]+)\s*$", t, re.I)
             number = _as_number(bare.group(1), ordinals=True) if bare else None
         if number is not None:
-            return actions.choose_from(self.lms, self.candidates, number)
+            return self._tag(actions.choose_from(self.lms, self.candidates, number),
+                             _source_suffix(self.cand_source))
 
         # 3) explicit source override phrases (win over the selector). Service
         # phrases route only the generic play_song; album/artist follow the
         # selector.
         m = P["local_prefix"].search(t)
         if m:
-            return self._played(actions.play_local(self.lms, m.group(1).strip()))
+            return self._played(actions.play_local(self.lms, m.group(1).strip()), "local")
         m = P["local_suffix"].search(t)
         if m:
-            return self._played(actions.play_local(self.lms, m.group(1).strip()))
+            return self._played(actions.play_local(self.lms, m.group(1).strip()), "local")
         for service in self.services:
-            m = re.search(P["service"].format(s=service), t, re.I)
+            m = re.search(P["service"].format(s=_service_re(service)), t, re.I)
             if m:
-                return self._played(
-                    actions.play_song(self.lms.for_service(service), m.group(1).strip()))
+                res = actions.play_song(self.lms.for_service(service), m.group(1).strip())
+                return self._played(self._tag(res, _source_suffix(service)), service)
 
         # 4) lists that open a numbered choice
         m = P["albums_list"].search(t)
         if m:  # "quali album ho di X" / "which albums do I have by X" -> local
-            return self._remember(actions.local_albums_list(self.lms, m.group(1).strip()))
+            return self._remember(
+                actions.local_albums_list(self.lms, m.group(1).strip()), "local")
         m = P["toptracks"].search(t)
         if m:  # top tracks -> streaming (selected or default service)
             return self._remember(
-                actions.top_tracks_list(self._stream(source), m.group(1).strip()))
+                actions.top_tracks_list(self._stream(source), m.group(1).strip()),
+                self._stream_name(source))
 
         # 4b) name-based choice from the last read-out list (only while a list is
         # open). "metti Supernatural" / "play Supernatural" / bare "Supernatural"
@@ -318,7 +373,7 @@ class Router:
                     self.lms, self.candidates, m.group(1).strip()
                 )
                 if chosen is not None:
-                    return chosen
+                    return self._tag(chosen, _source_suffix(self.cand_source))
 
         # 5) album — streaming or local per selector
         m = P["album"].search(t)
@@ -328,7 +383,10 @@ class Router:
         # 6) playlist (streaming: selected or default service)
         m = P["playlist"].search(t)
         if m:
-            return actions.play_playlist(self._stream(source), m.group(1).strip())
+            name = self._stream_name(source)
+            return self._tag(
+                actions.play_playlist(self.lms.for_service(name), m.group(1).strip()),
+                _source_suffix(name))
 
         # 7) artist — streaming or local per selector
         m = P["artist"].search(t)

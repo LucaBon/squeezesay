@@ -547,7 +547,9 @@ def choose_from(
         _dispatch_play(lms, chosen)
     except LMSError:
         return msg("err_unreachable")
-    return msg("playing", name=chosen["title"])
+    return ActionResult(
+        msg("playing", name=chosen["title"]), ok=True, terms=[chosen["title"]]
+    )
 
 
 def choose_by_name(
@@ -589,7 +591,9 @@ def choose_by_name(
         _dispatch_play(lms, chosen)
     except LMSError:
         return msg("err_unreachable")
-    return msg("playing", name=chosen["title"])
+    return ActionResult(
+        msg("playing", name=chosen["title"]), ok=True, terms=[chosen["title"]]
+    )
 
 
 # -- local library (Music Folder / USB) -----------------------------------

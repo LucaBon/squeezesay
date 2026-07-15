@@ -120,7 +120,19 @@ def test_play_album_en(router, transport, make_tidal):
         items={"A": [{"id": "alb1", "name": "The Wall", "hasitems": 1}]},
     )
     speech = router.handle("play the album The Wall", source="tidal", lang="en")
-    assert speech == "Playing the album The Wall."
+    assert speech == "Playing the album The Wall from TIDAL."
+
+
+def test_qobuz_misheard_by_asr_en(router, transport, make_tidal):
+    # en-US Web Speech writes "qobuz" as "kaboots": the explicit-source phrase
+    # must match the sound-alike, not just the exact spelling.
+    transport.responses["qobuz"] = make_tidal(
+        categories={"Tracks": "T"},
+        items={"T": [{"isaudio": 1, "url": "qobuz://9.flac", "name": "Time"}]},
+    )
+    speech = router.handle("on kaboots play Time", source="local", lang="en")
+    assert speech.startswith("Playing Time")
+    assert ["playlist", "play", "qobuz://9.flac"] in transport.commands()
 
 
 def test_local_prefix_en(router, transport):
@@ -153,7 +165,7 @@ def test_top_tracks_then_choose_number_en(router, transport, make_tidal):
     assert speech.startswith("Here are the most played tracks by Pink Floyd.")
     assert "1: Time" in speech and "2: Money" in speech
     speech = router.handle("play number two", source="tidal", lang="en")
-    assert speech == "Playing Money."
+    assert speech == "Playing Money from TIDAL."
     assert ["playlist", "play", "tidal://2.flc"] in transport.commands()
 
 
@@ -263,7 +275,7 @@ def test_album_without_article_en(router, transport, make_tidal):
         items={"A": [{"id": "alb1", "name": "The Wall", "hasitems": 1}]},
     )
     assert router.handle("play album The Wall", source="tidal",
-                         lang="en") == "Playing the album The Wall."
+                         lang="en") == "Playing the album The Wall from TIDAL."
 
 
 @pytest.mark.parametrize(
@@ -299,7 +311,7 @@ def _open_list_en(router, transport, make_tidal):
                                     "the second song", "second"])
 def test_choose_ordinal_en(router, transport, make_tidal, phrase):
     _open_list_en(router, transport, make_tidal)
-    assert router.handle(phrase, source="tidal", lang="en") == "Playing Money."
+    assert router.handle(phrase, source="tidal", lang="en") == "Playing Money from TIDAL."
     assert ["playlist", "play", "tidal://2.flc"] in transport.commands()
 
 

@@ -88,6 +88,10 @@ IT = {
     "blocklist_listing": "Brani bloccati: {terms}.",
 
     # -- web router (localvoice) ---------------------------------------------
+    # Source tag appended to a play confirmation: with three sources (local,
+    # TIDAL, Qobuz) the reply must say which one answered.
+    "from_service": " da {service}",
+    "from_local": " dalla tua musica",
     "heard_nothing": "Non ho sentito niente.",
     "router_fallback":
         "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "
@@ -185,6 +189,10 @@ EN = {
     "blocklist_listing": "Blocked songs: {terms}.",
 
     # -- web router (localvoice) ---------------------------------------------
+    # Source tag appended to a play confirmation: with three sources (local,
+    # TIDAL, Qobuz) the reply must say which one answered.
+    "from_service": " from {service}",
+    "from_local": " from your music",
     "heard_nothing": "I didn't hear anything.",
     "router_fallback":
         "I didn't understand. Try: play, play the album, from my music, "
