@@ -22,6 +22,7 @@ import socket
 import ssl
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,11 +31,15 @@ sys.path.insert(0, os.path.join(ROOT, "lambda"))  # actions, lms
 sys.path.insert(0, HERE)  # router
 
 import discovery  # noqa: E402
-from lms import SERVICES, LMSClient  # noqa: E402
+from lms import SERVICES, LMSClient, LMSError  # noqa: E402
 from messages import msg  # noqa: E402
 from router import Router  # noqa: E402
 
-INDEX_HTML = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
+def _index_html() -> str:
+    # Riletta a ogni richiesta: un edit a index.html arriva con un semplice
+    # refresh, senza riavviare il server. Costo trascurabile in LAN locale.
+    with open(os.path.join(HERE, "index.html"), encoding="utf-8") as f:
+        return f.read()
 
 # PWA assets, read once at startup like the page itself. ca.pem is resolved at
 # runtime (next to --cert) so the phone can download and trust the local CA.
@@ -78,6 +83,31 @@ def lan_ips() -> list:
     return []
 
 
+def wait_for_players(lms_url: str, delay: float = 5.0, sleep=time.sleep) -> list:
+    """The LMS player list, retrying until the LMS answers.
+
+    Il PC che ospita questo server spesso si risveglia (o fa boot) PRIMA che
+    la rete sia tornata su: un LMS irraggiungibile in quel momento non è un
+    errore fatale ma uno stato transitorio. Invece di morire con un traceback
+    (costringendo a rilanciare a mano finché non va), aspetta e riprova.
+    Ctrl+C esce.
+    """
+    waited = False
+    while True:
+        try:
+            players = LMSClient(lms_url, "0").get_players()
+            if waited:
+                print("LMS raggiunto.")
+            return players
+        except LMSError as exc:
+            if not waited:
+                print(f"LMS non raggiungibile: {exc}")
+                print(f"Aspetto che {lms_url} risponda, riprovo ogni "
+                      f"{delay:g} secondi (Ctrl+C per uscire)...")
+                waited = True
+            sleep(delay)
+
+
 def make_handler(lms, material_url: str, services, default_service: str,
                  ca_path=None):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
@@ -107,7 +137,7 @@ def make_handler(lms, material_url: str, services, default_service: str,
 
         def do_GET(self):
             if self.path in ("/", "/index.html"):
-                page = INDEX_HTML.replace("__MATERIAL_URL__", material_url)
+                page = _index_html().replace("__MATERIAL_URL__", material_url)
                 page = page.replace("__SERVICES__", json.dumps(services))
                 self._send(200, page, "text/html")
             elif self.path in STATIC:
@@ -189,9 +219,17 @@ def main() -> int:
             return 1
         print(f"LMS trovato: {lms_url}")
 
+    # Aspetta che l'LMS risponda anche quando --player è già noto: subito dopo
+    # c'è la rilevazione dei servizi streaming, che con la rete giù ripiegherebbe
+    # in silenzio sul solo TIDAL.
+    try:
+        players = wait_for_players(lms_url)
+    except KeyboardInterrupt:
+        print("\nStop.")
+        return 1
+
     player = args.player
     if not player:
-        players = LMSClient(lms_url, "0").get_players()
         if not players:
             print(f"Nessun player trovato su {lms_url}")
             return 1
