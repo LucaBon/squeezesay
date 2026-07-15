@@ -32,7 +32,7 @@
   @media (prefers-color-scheme: light) { :root {
     --bg: #f4f7f5; --surface: #ffffff; --surface-raised: #ffffff;
     --border: #d7dfda; --text: #1b201d; --text-muted: #55605a;
-    --brand-strong: #236237; --brand-soft: #e3f0e8;
+    --brand: #1e7a3a; --brand-strong: #236237; --brand-soft: #e3f0e8;
     --brand-border: #9ec7ac; --accent-text: #226038;
     --amber-text: #8a5a12; --amber-soft: #f7ecd8;
     --danger: #a93226; --danger-soft: #f9e9e7;
@@ -43,15 +43,26 @@
   * { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5;
          color: var(--text); background: var(--bg);
-         padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
-                  max(1.2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-         display: flex; flex-direction: column; gap: .9rem; align-items: center;
-         min-height: 100dvh; }
+         display: flex; flex-direction: column; align-items: center;
+         height: 100dvh; overflow: hidden; }
+  /* Sticky hero area: mic + input always visible at the top */
+  .hero { flex-shrink: 0; display: flex; flex-direction: column; gap: .7rem;
+          align-items: center; width: 100%;
+          padding: max(.8rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+                   0 max(1rem, env(safe-area-inset-left)); }
+  /* Scrollable content area below the hero */
+  .content { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+             overscroll-behavior-y: contain;
+             display: flex; flex-direction: column; gap: .7rem; align-items: center;
+             width: 100%;
+             padding: .7rem max(1rem, env(safe-area-inset-right))
+                      max(1.2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
   h1 { font-size: 1.15rem; font-weight: 600; margin: .2rem 0 0; letter-spacing: .02em; }
   /* power-LED brand mark in place of the old emoji */
   h1::before { content: ""; display: inline-block; width: .55em; height: .55em;
                border-radius: 50%; background: var(--amber);
-               box-shadow: 0 0 8px var(--amber); margin-right: .5em; }
+               box-shadow: 0 0 8px var(--amber); margin-right: .5em;
+               vertical-align: middle; }
   :focus-visible { outline: 2px solid var(--brand-strong); outline-offset: 2px; }
   a, a.hint { color: var(--accent-text); }
   /* the hero: a lit knob — green when ready, amber VU pulse while listening */
@@ -61,30 +72,35 @@
          background: radial-gradient(circle at 35% 30%,
                      var(--brand-strong), var(--brand) 55%, #1f5c33);
          box-shadow: var(--shadow), var(--glow-brand);
-         transition: transform .1s, filter .2s, box-shadow .2s; }
+         transition: transform .1s, filter .2s, box-shadow .2s;
+         -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   #mic:hover { filter: brightness(1.08); }
   #mic:active { transform: scale(.96); }
+  #mic:focus-visible { outline: 3px solid var(--amber); outline-offset: 4px; }
   #mic.listening { background: radial-gradient(circle at 35% 30%,
                    #f0b254, var(--amber) 55%, #b87a24);
                    color: var(--on-amber); animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100%{ box-shadow: var(--shadow), 0 0 0 0 rgba(232,161,60,.55) }
                      50%{ box-shadow: var(--shadow), 0 0 0 20px rgba(232,161,60,0) } }
-  #micstate { margin-top: -.4rem; font-family: var(--font-label); font-size: .72rem;
+  #micstate { margin-top: -.2rem; font-family: var(--font-label); font-size: .72rem;
               text-transform: uppercase; letter-spacing: .08em; }
-  #mic.listening + #micstate { color: var(--amber-text); }
+  #mic.listening ~ #micstate { color: var(--amber-text); }
   .row { display: flex; gap: .5rem; width: 100%; max-width: 480px; }
   input, select { background: var(--surface); color: var(--text);
                   border: 1px solid var(--border); }
   .row input { flex: 1; padding: .7rem; font-size: 1rem; border-radius: var(--radius-s); }
   button.send { padding: .7rem 1rem; font-size: 1rem; border-radius: var(--radius-s);
                 border: none; background: var(--brand); color: var(--on-brand);
-                cursor: pointer; transition: background .15s, transform .1s; }
+                cursor: pointer; transition: background .15s, transform .1s;
+                min-height: 44px; min-width: 44px; }
   button.send:hover { background: var(--brand-strong); }
   button.send:active { transform: scale(.98); }
   button.send:disabled { opacity: .55; cursor: default; }
-  #log { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: .4rem; }
-  .bubble { padding: .6rem .8rem; border-radius: var(--radius-l); max-width: 85%;
-            animation: bubble-in .15s ease-out; }
+  /* Chat log: newest on top, scrollable within .content */
+  #log { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: .45rem; }
+  .bubble { padding: .65rem .9rem; border-radius: var(--radius-l); max-width: 85%;
+            animation: bubble-in .15s ease-out; font-size: .95rem; line-height: 1.45;
+            word-break: break-word; }
   @keyframes bubble-in { from { opacity: 0; transform: translateY(4px); } }
   .you { align-self: flex-end; background: var(--brand-soft);
          background-image: linear-gradient(rgba(255,255,255,.03), transparent);
@@ -93,9 +109,9 @@
          border: 1px solid var(--border); box-shadow: var(--shadow);
          border-bottom-left-radius: var(--radius-s); }
   .sys.warn { border-color: var(--danger); background: var(--danger-soft); color: var(--text); }
-  .sys.warn::before { content: "⚠ "; }
+  .sys.warn::before { content: "\26A0\FE0F "; }
   .sys.pending { background: var(--amber-soft); }
-  .sys.pending::after { content: "···"; letter-spacing: .15em;
+  .sys.pending::after { content: " \00B7\00B7\00B7"; letter-spacing: .15em;
                         color: var(--amber-text);
                         animation: dots 1s steps(4) infinite; }
   @keyframes dots { 0%{ opacity:.2 } 50%{ opacity:1 } 100%{ opacity:.2 } }
@@ -115,17 +131,21 @@
   .opts { display: flex; flex-direction: column; gap: .55rem; width: 100%;
           align-items: flex-start; margin-top: .5rem; }
   .opts input[type=text] { padding: .3rem .4rem; font-size: .9rem; border-radius: .4rem; }
-  .choices { display: flex; flex-wrap: wrap; gap: .35rem; max-width: 480px;
+  .choices { display: flex; flex-wrap: wrap; gap: .4rem; max-width: 480px;
              align-self: flex-start; margin: -.1rem 0 .2rem; }
-  .choice { padding: .4rem .75rem; border-radius: 999px; cursor: pointer;
+  .choice { padding: .5rem .85rem; border-radius: 999px; cursor: pointer;
             border: 1px solid var(--brand-border); background: var(--brand-soft);
             color: inherit; font-size: .9rem; font-variant-numeric: tabular-nums;
-            transition: border-color .15s, transform .1s, box-shadow .15s; }
+            transition: border-color .15s, transform .1s, box-shadow .15s;
+            min-height: 44px; display: inline-flex; align-items: center; }
   .choice:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
   .choice:active { transform: scale(.97); }
   #empty { display: flex; flex-direction: column; gap: .5rem; align-items: center;
            width: 100%; max-width: 480px; }
   #empty .choices { justify-content: center; align-self: center; }
+  /* Visually-hidden utility for screen-reader-only text */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+             overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
     #mic.listening { box-shadow: var(--shadow), 0 0 0 6px rgba(232,161,60,.45); }
@@ -133,15 +153,21 @@
 </style>
 </head>
 <body>
-  <h1 data-i18n="h1">Impianto — comando vocale locale</h1>
-  <button id="mic" title="Tieni premuto o clicca e parla" aria-pressed="false">🎙️</button>
-  <div id="micstate" class="hint" data-i18n="micstate_idle">tocca e parla</div>
-  <div id="status" class="hint" role="status" aria-live="polite">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
-  <div class="row">
-    <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off">
-    <button class="send" id="send" data-i18n="send">Invia</button>
+  <div class="hero">
+    <h1 data-i18n="h1">Impianto — comando vocale locale</h1>
+    <button id="mic" type="button" title="Tieni premuto o clicca e parla"
+            aria-pressed="false" aria-label="Tieni premuto o clicca e parla">🎙️</button>
+    <div id="micstate" class="hint" aria-hidden="true" data-i18n="micstate_idle">tocca e parla</div>
+    <div id="status" class="hint" role="status" aria-live="polite">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
+    <div class="row">
+      <label for="text" class="sr-only" data-i18n="lbl_text">Comando testuale</label>
+      <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off"
+             enterkeyhint="send">
+      <button class="send" id="send" type="button" data-i18n="send">Invia</button>
+    </div>
   </div>
-  <div id="log" aria-live="polite" aria-relevant="additions text"></div>
+  <div class="content">
+  <div id="log" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Cronologia comandi"></div>
   <div id="empty">
     <div class="hint" data-i18n="empty_title">Prova a dire o scrivere:</div>
     <div class="choices" data-i18n="empty_chips">
@@ -213,6 +239,7 @@
   </details>
   <a class="hint" id="material" href="__MATERIAL_URL__" target="_blank" rel="noopener"
      data-i18n="material_link">Vuoi vedere coda, copertine e sfogliare? Apri Material Skin ↗</a>
+  </div><!-- /.content -->
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -235,6 +262,7 @@ function bubble(text, who) {
   d.className = "bubble " + who;
   d.textContent = text;
   log.prepend(d);
+  log.closest(".content").scrollTop = 0;  // newest bubble always in view
   return d;
 }
 
@@ -363,6 +391,8 @@ const UI_EN = {
   say_command: "Yes? Tell me the command…",
   tap_mic: "Tap the microphone and speak.",
   mic_error: "Microphone error: ",
+  lbl_text: "Text command",
+  log_label: "Command history",
 };
 // Italian counterparts of the dynamic strings (the labels come from the markup).
 const UI_IT = {
@@ -386,6 +416,8 @@ const UI_IT = {
   say_command: "Sì? Dimmi il comando…",
   tap_mic: "Tocca il microfono e parla.",
   mic_error: "Errore microfono: ",
+  lbl_text: "Comando testuale",
+  log_label: "Cronologia comandi",
 };
 const IT_MARKUP = {};  // Italian innerHTML of every [data-i18n], snapshotted at load
 document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -415,8 +447,10 @@ function applyUI() {
     el.innerHTML = (en && UI_EN[k] !== undefined) ? UI_EN[k] : IT_MARKUP[k];
   });
   $("text").placeholder = ui("ph_text");
+  $("text").setAttribute("aria-label", ui("lbl_text"));
   $("mic").title = ui("mic_title");
   $("mic").setAttribute("aria-label", ui("mic_title"));
+  $("log").setAttribute("aria-label", ui("log_label"));
   // the data-i18n swap resets #micstate to idle text: keep it truthful while listening
   $("micstate").textContent = $("mic").classList.contains("listening")
     ? ui("micstate_listening") : ui("micstate_idle");
