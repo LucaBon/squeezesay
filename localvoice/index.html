@@ -45,11 +45,22 @@
          color: var(--text); background: var(--bg);
          display: flex; flex-direction: column; align-items: center;
          height: 100dvh; overflow: hidden; }
-  /* Sticky hero area: mic + input always visible at the top */
+  /* Sticky hero area: mic + input always visible at the top.
+     Carries a faint stage-light glow behind the knob, and fades out at the
+     bottom so the log appears to slide underneath it. */
   .hero { flex-shrink: 0; display: flex; flex-direction: column; gap: .7rem;
-          align-items: center; width: 100%;
+          align-items: center; width: 100%; position: relative; z-index: 2;
+          background: radial-gradient(58% 46% at 50% 12%,
+                      rgba(45,125,70,.14), transparent 72%) var(--bg);
           padding: max(.8rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
-                   0 max(1rem, env(safe-area-inset-left)); }
+                   .2rem max(1rem, env(safe-area-inset-left)); }
+  .hero::after { content: ""; position: absolute; left: 0; right: 0;
+                 bottom: -1.1rem; height: 1.1rem; pointer-events: none;
+                 background: linear-gradient(var(--bg), transparent); }
+  @media (prefers-color-scheme: light) {
+    .hero { background: radial-gradient(58% 46% at 50% 12%,
+                        rgba(45,125,70,.08), transparent 72%) var(--bg); }
+  }
   /* Scrollable content area below the hero */
   .content { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
              overscroll-behavior-y: contain;
@@ -68,20 +79,33 @@
   /* the hero: a lit knob — green when ready, amber VU pulse while listening */
   #mic { width: 136px; height: 136px; border-radius: 50%;
          border: 3px solid rgba(255,255,255,.08);
-         font-size: 2.7rem; cursor: pointer; color: var(--on-brand);
+         cursor: pointer; color: var(--on-brand);
+         display: inline-flex; align-items: center; justify-content: center;
          background: radial-gradient(circle at 35% 30%,
                      var(--brand-strong), var(--brand) 55%, #1f5c33);
-         box-shadow: var(--shadow), var(--glow-brand);
+         /* machined bezel: dark gap + thin metallic rim + inner top-light */
+         box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(255,255,255,.1),
+                     inset 0 2px 8px rgba(255,255,255,.22),
+                     inset 0 -10px 18px rgba(0,0,0,.32),
+                     var(--shadow), var(--glow-brand);
          transition: transform .1s, filter .2s, box-shadow .2s;
          -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  #mic svg { width: 54px; height: 54px;
+             filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
   #mic:hover { filter: brightness(1.08); }
   #mic:active { transform: scale(.96); }
   #mic:focus-visible { outline: 3px solid var(--amber); outline-offset: 4px; }
   #mic.listening { background: radial-gradient(circle at 35% 30%,
                    #f0b254, var(--amber) 55%, #b87a24);
                    color: var(--on-amber); animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100%{ box-shadow: var(--shadow), 0 0 0 0 rgba(232,161,60,.55) }
-                     50%{ box-shadow: var(--shadow), 0 0 0 20px rgba(232,161,60,0) } }
+  /* bezel shadows repeated so the pulse ring doesn't wipe them out */
+  @keyframes pulse {
+    0%,100%{ box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(255,255,255,.1),
+             inset 0 2px 8px rgba(255,255,255,.22), inset 0 -10px 18px rgba(0,0,0,.32),
+             var(--shadow), var(--glow-amber), 0 0 0 5px rgba(232,161,60,.55) }
+    50%{ box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(255,255,255,.1),
+         inset 0 2px 8px rgba(255,255,255,.22), inset 0 -10px 18px rgba(0,0,0,.32),
+         var(--shadow), var(--glow-amber), 0 0 0 24px rgba(232,161,60,0) } }
   #micstate { margin-top: -.2rem; font-family: var(--font-label); font-size: .72rem;
               text-transform: uppercase; letter-spacing: .08em; }
   #mic.listening ~ #micstate { color: var(--amber-text); }
@@ -90,7 +114,9 @@
                   border: 1px solid var(--border); }
   .row input { flex: 1; padding: .7rem; font-size: 1rem; border-radius: var(--radius-s); }
   button.send { padding: .7rem 1rem; font-size: 1rem; border-radius: var(--radius-s);
-                border: none; background: var(--brand); color: var(--on-brand);
+                border: none; color: var(--on-brand);
+                background: linear-gradient(rgba(255,255,255,.09), transparent) var(--brand);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.12), var(--shadow);
                 cursor: pointer; transition: background .15s, transform .1s;
                 min-height: 44px; min-width: 44px; }
   button.send:hover { background: var(--brand-strong); }
@@ -104,12 +130,14 @@
   @keyframes bubble-in { from { opacity: 0; transform: translateY(4px); } }
   .you { align-self: flex-end; background: var(--brand-soft);
          background-image: linear-gradient(rgba(255,255,255,.03), transparent);
+         border: 1px solid var(--brand-border);
          border-bottom-right-radius: var(--radius-s); }
   .sys { align-self: flex-start; background: var(--surface);
          border: 1px solid var(--border); box-shadow: var(--shadow);
          border-bottom-left-radius: var(--radius-s); }
   .sys.warn { border-color: var(--danger); background: var(--danger-soft); color: var(--text); }
-  .sys.warn::before { content: "\26A0\FE0F "; }
+  /* \26A0 without \FE0F = monochrome glyph, tinted to match the red lamp */
+  .sys.warn::before { content: "\26A0  "; color: var(--danger); font-weight: 600; }
   .sys.pending { background: var(--amber-soft); }
   .sys.pending::after { content: " \00B7\00B7\00B7"; letter-spacing: .15em;
                         color: var(--amber-text);
@@ -121,9 +149,22 @@
           border-radius: var(--radius-m); box-shadow: var(--shadow);
           padding: .7rem 1rem; width: 100%; max-width: 480px; text-align: left; }
   details[open].card { background: var(--surface-raised); }
-  .card > summary { cursor: pointer; font-weight: 500; padding: .15rem 0;
-                    color: var(--text-muted); }
+  details.card { transition: border-color .15s; }
+  details.card:hover { border-color: var(--brand-border); }
+  /* custom chevron instead of the default disclosure triangle */
+  .card > summary { cursor: pointer; font-weight: 500; min-height: 44px;
+                    display: flex; align-items: center; gap: .5rem;
+                    color: var(--text-muted); list-style: none;
+                    -webkit-tap-highlight-color: transparent; }
+  .card > summary::-webkit-details-marker { display: none; }
+  .card > summary::after { content: ""; margin-left: auto; flex-shrink: 0;
+                           width: .45em; height: .45em;
+                           border-right: 2px solid var(--text-muted);
+                           border-bottom: 2px solid var(--text-muted);
+                           transform: rotate(45deg) translate(-1px,-1px);
+                           transition: transform .2s; }
   details[open].card > summary { color: var(--text); }
+  details[open].card > summary::after { transform: rotate(225deg); }
   .vset { display: flex; flex-direction: column; gap: .35rem; margin: .3rem 0; }
   .vrow { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
   .vrow select { max-width: 62%; }
@@ -148,7 +189,9 @@
              overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
-    #mic.listening { box-shadow: var(--shadow), 0 0 0 6px rgba(232,161,60,.45); }
+    #mic.listening { box-shadow: 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(255,255,255,.1),
+                     inset 0 2px 8px rgba(255,255,255,.22), inset 0 -10px 18px rgba(0,0,0,.32),
+                     var(--shadow), 0 0 0 6px rgba(232,161,60,.45); }
   }
 </style>
 </head>
@@ -156,7 +199,7 @@
   <div class="hero">
     <h1 data-i18n="h1">Impianto — comando vocale locale</h1>
     <button id="mic" type="button" title="Tieni premuto o clicca e parla"
-            aria-pressed="false" aria-label="Tieni premuto o clicca e parla">🎙️</button>
+            aria-pressed="false" aria-label="Tieni premuto o clicca e parla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/><path d="M8.5 21h7"/></svg></button>
     <div id="micstate" class="hint" aria-hidden="true" data-i18n="micstate_idle">tocca e parla</div>
     <div id="status" class="hint" role="status" aria-live="polite">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
     <div class="row">
@@ -180,7 +223,7 @@
       «<i>da qobuz</i> …».</div>
   </div>
   <details id="settings" class="card">
-    <summary data-i18n="settings_summary">⚙️ Impostazioni</summary>
+    <summary data-i18n="settings_summary">Impostazioni</summary>
     <div class="opts">
       <label class="hint"><input type="checkbox" id="autosend"> <span data-i18n="autosend">invia subito dopo il microfono (mani libere)</span></label>
       <label class="vrow hint" style="width:100%"><span data-i18n="lbl_reclang">Lingua che parlo al microfono</span>
@@ -221,7 +264,7 @@
       «audio slave»), correggilo nella casella e premi Invia.</div>
   </details>
   <details class="hint card" id="installpanel">
-    <summary data-i18n="install_summary">📱 Installa come app (senza avvisi del certificato)</summary>
+    <summary data-i18n="install_summary">Installa come app (senza avvisi del certificato)</summary>
     <ol style="text-align:left; padding-left:1.2rem; margin:.4rem 0" data-i18n="install_steps">
       <li>Scarica la CA locale: <a id="calink" href="/ca.pem">ca.pem</a> (una volta sola per dispositivo).</li>
       <li><b>Android</b>: Impostazioni → Sicurezza → Altro / Crittografia e credenziali →
@@ -352,7 +395,7 @@ const UI_EN = {
     "<li>“from my music play …” · “on tidal play …” · “on qobuz play …”</li>" +
     "<li>“pause” · “resume” · “next” · “volume up” · “what's playing”</li>",
   tip_names: "Tip: if a name is <b>misheard</b>, fix it in the box and press Send.",
-  install_summary: "📱 Install as an app (no certificate warnings)",
+  install_summary: "Install as an app (no certificate warnings)",
   install_steps: '<li>Download the local CA: <a id="calink" href="/ca.pem">ca.pem</a> (once per device).</li>' +
     "<li><b>Android</b>: Settings → Security → More / Encryption &amp; credentials → " +
     "Install a certificate → <b>CA certificate</b> → pick the downloaded file.<br>" +
@@ -370,7 +413,7 @@ const UI_EN = {
   empty_chips: '<button class="choice" data-cmd="play Comfortably Numb by Pink Floyd">play Comfortably Numb by Pink Floyd</button>' +
     '<button class="choice" data-cmd="which albums do I have by Pink Floyd">which albums do I have by Pink Floyd</button>' +
     '<button class="choice" data-cmd="what\'s playing">what\'s playing</button>',
-  settings_summary: "⚙️ Settings",
+  settings_summary: "Settings",
   // dynamic strings used from JS
   micstate_listening: "listening…",
   no_voice: "(no voice)",
