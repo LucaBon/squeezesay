@@ -20,3 +20,9 @@ lambda/*.dist-info/
 !config.example.env
 lambda/config.py
 config.py
+
+# Local session data
+.claude/
+
+# Generated screenshots (tools/ui_shots.py)
+tools/shots/
