@@ -18,32 +18,33 @@ That's it: LMS is auto-discovered on the LAN, the TLS certificate is generated o
 first start into a persistent volume (so the browser warning is one-time), and the
 container restarts on boot (`restart: unless-stopped` — no systemd/autostart needed).
 Everything is configured via environment variables in
-[docker-compose.yml](docker-compose.yml), all optional:
+[docker-compose.yml](docker-compose.yml), all optional (the pre-rename
+`SQUEEZESAY_*` names still work for one release, with a deprecation note):
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `SQUEEZESAY_LMS` | LMS URL, e.g. `http://192.168.1.50:9000` | auto-discovery (UDP) |
-| `SQUEEZESAY_PLAYER` | player MAC | first player found |
-| `SQUEEZESAY_PORT` | listen port | `8730` |
-| `SQUEEZESAY_HTTPS` | `0` = plain HTTP (mic on localhost only) | `1` |
-| `SQUEEZESAY_CERT_HOSTS` | extra SANs for the certificate (comma-separated) | — |
-| `SQUEEZESAY_MATERIAL_URL` | URL for the "Material Skin" link | `<lms>/material/` |
+| `VIVAVOCE_LMS` | LMS URL, e.g. `http://192.168.1.50:9000` | auto-discovery (UDP) |
+| `VIVAVOCE_PLAYER` | player MAC | first player found |
+| `VIVAVOCE_PORT` | listen port | `8730` |
+| `VIVAVOCE_HTTPS` | `0` = plain HTTP (mic on localhost only) | `1` |
+| `VIVAVOCE_CERT_HOSTS` | extra SANs for the certificate (comma-separated) | — |
+| `VIVAVOCE_MATERIAL_URL` | URL for the "Material Skin" link | `<lms>/material/` |
 
 > [!NOTE]
 > The compose file uses `network_mode: host`, which is what makes auto-discovery and
 > the certificate "just work" — it requires Linux (fine on NAS/Raspberry Pi). On
 > **Docker Desktop (Windows/Mac)** or bridge networks, follow the comments in
-> [docker-compose.yml](docker-compose.yml): map the port, set `SQUEEZESAY_LMS`
-> explicitly, and put the host's LAN IP in `SQUEEZESAY_CERT_HOSTS`.
+> [docker-compose.yml](docker-compose.yml): map the port, set `VIVAVOCE_LMS`
+> explicitly, and put the host's LAN IP in `VIVAVOCE_CERT_HOSTS`.
 
 ### Home Assistant add-on
 
-If you run Home Assistant OS/Supervised, SqueezeSay installs as an add-on
+If you run Home Assistant OS/Supervised, Vivavoce installs as an add-on
 (same engine, wrapped for the Supervisor — see [ha-addon/](ha-addon/)):
 
 1. **Settings → Add-ons → Add-on store → ⋮ → Repositories** → add
-   `https://github.com/LucaBon/squeezesay`.
-2. Install **SqueezeSay** and start it. LMS is auto-discovered; the options
+   `https://github.com/LucaBon/vivavoce`.
+2. Install **Vivavoce** and start it. LMS is auto-discovered; the options
    (all optional: `lms_url`, `player`, `port`, `https`, `cert_hosts`,
    `material_url`) mirror the Docker environment variables above.
 3. Open `https://<home-assistant-ip>:8730` and accept the certificate warning
@@ -72,7 +73,7 @@ uv run python localvoice/server.py --cert cert.pem --key key.pem
 # open https://<this-pc-ip>:8730  (accept the warning once)
 ```
 
-`make_cert.py` creates a private **"SqueezeSay Local CA"** (reused on every rerun)
+`make_cert.py` creates a private **"Vivavoce Local CA"** (reused on every rerun)
 and signs the server certificate with it. You can stop at the one-time browser
 warning — everything works as before — or go one step further:
 
@@ -93,9 +94,9 @@ The **text box works everywhere**, even over HTTP.
 - **Windows:** `tools/run_local.ps1` (starts HTTPS, generates the cert if missing) and
   `tools/install_autostart.ps1` (scheduled task at logon + firewall rule; run **as
   Administrator**). `tools/uninstall_autostart.ps1` removes it.
-- **Linux** (Raspberry Pi / mini-PC): `deploy/squeezesay.service` (systemd). Copy to
+- **Linux** (Raspberry Pi / mini-PC): `deploy/vivavoce.service` (systemd). Copy to
   `/etc/systemd/system/`, adapt `WorkingDirectory`/paths, then
-  `sudo systemctl enable --now squeezesay`.
+  `sudo systemctl enable --now vivavoce`.
 
 ### Using it from a phone
 1. Same Wi-Fi as the server PC.
@@ -107,7 +108,7 @@ The **text box works everywhere**, even over HTTP.
    warnings, fullscreen app icon. When the reply offers a numbered list, its choices
    appear as **tappable buttons** — tap instead of saying "metti la 2".
 5. Optional, hands-free: tick **"attiva a voce con una parola chiave"** and start commands
-   with the wake word ("impianto" by default) — «impianto metti Time».
+   with the wake word ("vivavoce" by default) — «vivavoce metti Time».
 6. Want the reply read aloud too? Tick **"🔊 leggi la risposta ad alta voce"**; the
    **Voci & lingue** panel then lets you pick natural per-language voices.
 
@@ -131,7 +132,7 @@ always win over the selector. (Docker needs nothing: detection is the default.)
 > then simply retry a few times; once a login succeeds the stored token keeps
 > working. To debug, set `plugin.qobuz` to Debug in LMS Settings → Advanced →
 > Logging (and set it back afterwards: at Debug level the plugin writes your
-> password's MD5 hash into server.log). To validate the SqueezeSay side, run
+> password's MD5 hash into server.log). To validate the Vivavoce side, run
 > `uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"`.
 
 ---
@@ -141,5 +142,5 @@ Edit files in `engine/`/`localvoice/` and restart the local server (Docker:
 `docker compose pull && docker compose up -d`; HA: update the add-on).
 
 ## Audio quality
-SqueezeSay sends **only commands**: audio flows LMS → Squeezelite (Daphile) →
+Vivavoce sends **only commands**: audio flows LMS → Squeezelite (Daphile) →
 DAC as always, so hi-res quality is unchanged. Make sure LMS doesn't resample to the player.

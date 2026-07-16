@@ -1,8 +1,8 @@
-# SqueezeSay — web app vocale locale, in un container.
+# Vivavoce — web app vocale locale, in un container.
 #
 #   docker compose up -d          # vedi docker-compose.yml (consigliato)
-#   docker build -t squeezesay .
-#   docker run --network host -v squeezesay-data:/data squeezesay
+#   docker build -t vivavoce .
+#   docker run --network host -v squeezesay-data:/data vivavoce
 #
 # L'immagine contiene la web app locale (localvoice/ + motore engine/).
 # Il certificato TLS viene generato al primo avvio nel volume /data.

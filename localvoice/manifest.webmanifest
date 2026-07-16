@@ -1,6 +1,6 @@
 {
-  "name": "SqueezeSay",
-  "short_name": "SqueezeSay",
+  "name": "Vivavoce",
+  "short_name": "Vivavoce",
   "description": "Local voice control for LMS/Squeezebox — Controllo vocale locale: di' un titolo e parte quel brano.",
   "start_url": "/",
   "scope": "/",

@@ -17,15 +17,15 @@ import json
 import os
 from typing import Any, Optional
 
-# Il namespace delle variabili d'ambiente. LEGACY_PREFIX (se impostato) viene
-# letto come ripiego per un rilascio, poi sparisce: chi ha ancora i vecchi
-# nomi configurati continua a funzionare ma vede l'avviso.
-PRIMARY_PREFIX = "SQUEEZESAY"
-LEGACY_PREFIX: Optional[str] = None
+# Il namespace delle variabili d'ambiente. LEGACY_PREFIX (il nome pre-rebrand)
+# viene letto come ripiego per un rilascio, poi sparisce: chi ha ancora i
+# vecchi nomi configurati continua a funzionare ma vede l'avviso.
+PRIMARY_PREFIX = "VIVAVOCE"
+LEGACY_PREFIX: Optional[str] = "SQUEEZESAY"
 
 # Il nome della cartella dati per-utente (Windows %APPDATA%\<qui>, XDG in
 # minuscolo su Linux/macOS).
-APP_DIR_NAME = "SqueezeSay"
+APP_DIR_NAME = "Vivavoce"
 
 _warned_legacy = set()
 

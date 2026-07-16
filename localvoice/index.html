@@ -8,7 +8,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
-<title>Impianto — voce locale</title>
+<title>Vivavoce — voce locale</title>
 <style>
   /* Hi-fi dark identity: deep green-tinted black + amber VU accents.
      Dark is the default (the showcase); a system set to light mode still
@@ -250,7 +250,7 @@
 </head>
 <body>
   <div class="hero">
-    <h1 data-i18n="h1">Impianto — comando vocale locale</h1>
+    <h1 data-i18n="h1">Vivavoce — comando vocale locale</h1>
     <button id="mic" type="button" title="Tieni premuto o clicca e parla"
             aria-pressed="false" aria-label="Tieni premuto o clicca e parla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/><path d="M8.5 21h7"/></svg></button>
     <div id="micstate" class="hint" aria-hidden="true" data-i18n="micstate_idle">tocca e parla</div>
@@ -294,10 +294,10 @@
       <label class="vrow hint" style="width:100%"><span data-i18n="lbl_source">Sorgente musica</span>
         <select id="source"></select></label>
       <label class="hint"><input type="checkbox" id="wakemode"> <span data-i18n="wakemode_lbl">attiva a voce con una parola chiave</span>
-        <input id="wakeword" type="text" value="impianto" autocomplete="off"></label>
+        <input id="wakeword" type="text" value="vivavoce" autocomplete="off"></label>
       <div id="wakehint" class="hint" style="display:none; text-align:left" data-i18n="wakehint">Ascolto continuo: il microfono
         resta attivo e l'audio passa dal riconoscimento vocale del browser. Poi tocca il microfono una
-        volta e di' «<b><span id="wwlabel">impianto</span></b> …» seguito dal comando.
+        volta e di' «<b><span id="wwlabel">vivavoce</span></b> …» seguito dal comando.
         <span class="warn">Su Android il browser emette un suono a ogni riattivazione dell'ascolto
         (ogni pochi secondi), e non si può togliere da qui: sul telefono conviene lasciare questa
         opzione spenta e usare il microfono a tocco (un suono solo per comando). La parola chiave dà
@@ -383,11 +383,12 @@ const log = $("log"), statusEl = $("status"), emptyEl = $("empty");
 // Stable per-browser id so this device's "metti la N" list stays its own on the
 // server (two phones don't clobber each other).
 function clientId() {
-  let id = localStorage.getItem("impianto_client");
+  let id = localStorage.getItem("vivavoce_client")
+        || localStorage.getItem("impianto_client");  // pre-rename installs
   if (!id) {
     id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("impianto_client", id);
   }
+  localStorage.setItem("vivavoce_client", id);
   return id;
 }
 
@@ -459,7 +460,7 @@ const foreignDefault = () => localStorage.getItem("foreign_default") || "en";
 // UI_EN holds the English versions. The page language follows the mic-language
 // selector: Italian stays Italian, every other speech language gets English.
 const UI_EN = {
-  h1: "Hi-fi — local voice control",
+  h1: "Vivavoce — local voice control",
   hint_sources: 'It searches <b>your library</b> and <b>streaming</b> on its own. ' +
     'To force a source: “<i>from my music</i> …”, “<i>on tidal</i> …” or “<i>on qobuz</i> …”.',
   send: "Send",
@@ -469,7 +470,7 @@ const UI_EN = {
   wakemode_lbl: "voice-activate with a keyword",
   wakehint: 'Continuous listening: the microphone stays on and the audio goes through ' +
     'the browser’s speech recognition. Tap the mic once, then say ' +
-    '“<b><span id="wwlabel">impianto</span></b> …” followed by the command. ' +
+    '“<b><span id="wwlabel">vivavoce</span></b> …” followed by the command. ' +
     '<span class="warn">On Android the browser plays a sound every time listening restarts ' +
     '(every few seconds) and it cannot be silenced from here: on phones, leave this off and ' +
     'use tap-to-talk (one sound per command). The keyword works best on PC/tablet with ' +
@@ -511,7 +512,7 @@ const UI_EN = {
   no_voice: "(no voice)",
   ph_text: "e.g. play Time by Pink Floyd",
   mic_title: "Tap and speak",
-  title_page: "Hi-fi — local voice",
+  title_page: "Vivavoce — local voice",
   status_tap_write: "Tap the microphone and speak, or type below.",
   src_auto: "Automatic: library, then streaming",
   src_local: "My library only",
@@ -567,7 +568,7 @@ const UI_IT = {
   no_voice: "(nessuna voce)",
   ph_text: "es. riproduci Time dei Pink Floyd",
   mic_title: "Tieni premuto o clicca e parla",
-  title_page: "Impianto — voce locale",
+  title_page: "Vivavoce — voce locale",
   status_tap_write: "Tocca il microfono e parla, oppure scrivi qui sotto.",
   src_auto: "Automatica: libreria, poi streaming",
   src_local: "Solo la mia libreria",
@@ -652,7 +653,7 @@ function applyUI() {
     ? ui("micstate_listening") : ui("micstate_idle");
   // wakehint embeds the wake-word span: restore its live value after the swap
   const ww = $("wwlabel");
-  if (ww) ww.textContent = ($("wakeword").value || "impianto").trim();
+  if (ww) ww.textContent = ($("wakeword").value || "vivavoce").trim();
   buildSourceOptions();
   buildVoicePickers();  // re-localizes the "(no voice)" option
   applyPro();           // re-localizes the Pro panel strings
@@ -966,8 +967,8 @@ $("kslock").onclick = () => ksAction("lock");
 $("ksdisable").onclick = () => ksAction("disable");
 
 // --- wake-word field (used by the recogniser below) ---
-const wakeWord = () => ($("wakeword").value || "impianto").trim();
-$("wakeword").value = localStorage.getItem("wakeword") || "impianto";
+const wakeWord = () => ($("wakeword").value || "vivavoce").trim();
+$("wakeword").value = localStorage.getItem("wakeword") || "vivavoce";
 $("wwlabel").textContent = wakeWord();
 $("wakeword").oninput = () => {
   localStorage.setItem("wakeword", $("wakeword").value);
@@ -1135,7 +1136,7 @@ if (!SR) {
   }
 
   // Fuzzy token match so common it-IT mis-hearings of the wake word still fire
-  // ("impianto" vs "impianti"/"impiant"): equal, a ≥4-char prefix, or ≤1 edit.
+  // ("vivavoce" vs "viva voce"/"vivavoci"): equal, a ≥4-char prefix, or ≤1 edit.
   function tokEq(a, b) {
     if (a === b) return true;
     if (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
@@ -1181,9 +1182,9 @@ if (!SR) {
   // session so the next command starts clean.
   function wakeResult(e) {
     // In this browser Chrome's continuous `results` are CUMULATIVE snapshots that
-    // grow entry by entry — each one repeats the words before it ("impianto",
-    // "impianto metti", "impianto metti Don't", ...), and even final entries do
-    // this. Joining them duplicates every word ("impianto impianto metti ..."),
+    // grow entry by entry — each one repeats the words before it ("vivavoce",
+    // "vivavoce metti", "vivavoce metti Don't", ...), and even final entries do
+    // this. Joining them duplicates every word ("vivavoce vivavoce metti ..."),
     // so take the single fullest (longest) transcript instead, which is the most
     // complete snapshot; use its alternatives when it's a final result.
     let best = null;

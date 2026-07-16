@@ -1,15 +1,15 @@
-# 🎵 SqueezeSay
+# 🎵 Vivavoce
 
 > Say **«metti Comfortably Numb dei Pink Floyd»** — and the *exact* song plays on your hi-fi.
 
 **Hands-free voice control — in Italian or English — for a [Daphile](https://www.daphile.com/) /
 [Lyrion Music Server](https://lyrion.org/) (LMS / Squeezebox) system — TIDAL and
 Qobuz included.**
-No cloud required, no LLM, no compromise on sound: SqueezeSay sends **only control
+No cloud required, no LLM, no compromise on sound: Vivavoce sends **only control
 commands**, while the audio keeps flowing LMS → Squeezelite → your DAC, bit-perfect.
 
 ```text
-You:  «impianto, metti Comfortably Numb dei Pink Floyd»
+You:  «vivavoce, metti Comfortably Numb dei Pink Floyd»
 App:  «Riproduco Comfortably Numb di Pink Floyd.»
 
 You:  «metti Love»
@@ -20,13 +20,13 @@ App:  «Riproduco Love di John Lennon.»
 
 ## The idea
 
-Great visual apps for this ecosystem already exist — SqueezeSay deliberately does
+Great visual apps for this ecosystem already exist — Vivavoce deliberately does
 **not** reinvent browsing, queueing, or now-playing. It's a **companion**:
 
 - 👀 **See & touch** with **[Material Skin](https://github.com/CDrummond/lms-material)**
   (web) or **[Squeezer](https://f-droid.org/en/packages/uk.org.ngo.squeezer/)** (Android)
   — browse, queue, artwork, multi-room.
-- 🗣️ **Speak** with **SqueezeSay** — the one thing those don't do well hands-free.
+- 🗣️ **Speak** with **Vivavoce** — the one thing those don't do well hands-free.
 
 The app is a **local web app** (`localvoice/`) over a tested engine
 (`engine/actions.py` + `engine/lms.py`): a browser mic/text page on your LAN
@@ -46,7 +46,7 @@ no LLM), so behaviour is testable and repeatable.
 | ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
 | 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
 | 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
-| 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("impianto" by default): «impianto metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
+| 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("vivavoce" by default): «vivavoce metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
 | 🌍 **Natural multilingual read-back** | Optional, off by default (the transcript is on screen). When on, the Italian frame is spoken by an Italian voice and the title/artist in *their* language (English/Spanish/French/German), with the best natural voices your browser offers — pickable in settings. |
 
 ## Quick start — local web app
@@ -63,7 +63,7 @@ docker compose up -d
 ```
 
 **As a Home Assistant add-on**: add this repo's URL under *Settings → Add-ons →
-Add-on store → ⋮ → Repositories*, then install **SqueezeSay** — see
+Add-on store → ⋮ → Repositories*, then install **Vivavoce** — see
 [DEPLOY.md](DEPLOY.md).
 
 
@@ -125,7 +125,7 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
   the page — commands are parsed and answered in that language, and the page
   labels follow it too. Other languages fall back to Italian for now.
 - **Wake-word mode on Android beeps**: the browser plays its own earcon every time
-  continuous listening restarts — a platform behaviour SqueezeSay can't silence
+  continuous listening restarts — a platform behaviour Vivavoce can't silence
   (the app warns about it in-page).
 - Streaming free-text search quality depends on the plugin; matching is deterministic
   (no LLM). Natural TTS voices depend on your device/browser.
@@ -133,13 +133,13 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
   for third-party clients (mid-2026), so the plugin's email+password login may
   fail with 401 a few times before it sticks — retry, or check the
   troubleshooting notes in DEPLOY.md. Once logged in, the stored token keeps
-  working. (SqueezeSay's Qobuz support itself is verified against a live
+  working. (Vivavoce's Qobuz support itself is verified against a live
   LMS 9 + plugin-Qobuz 3.7.0.)
 - **No Spotify**: Spotify Lossless (launched Sept 2025) is not delivered to
   third-party Connect clients, so the LMS plugin (Spotty/librespot) still gets
   lossy Ogg Vorbis 320 kbps — pointless on a bit-perfect chain. If Spotify ever
   opens lossless to the Connect API, a plugin path may become worth adding.
-- Bit-perfect: SqueezeSay sends **only commands**; ensure LMS doesn't resample to the player.
+- Bit-perfect: Vivavoce sends **only commands**; ensure LMS doesn't resample to the player.
 
 ## License
 

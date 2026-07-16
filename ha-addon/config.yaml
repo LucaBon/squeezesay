@@ -1,13 +1,17 @@
-# Add-on Home Assistant per la web app vocale locale di SqueezeSay.
+# Add-on Home Assistant per la web app vocale locale di Vivavoce.
 #
 # host_network: serve sia all'auto-discovery UDP di LMS sia ad avere gli IP
 # LAN giusti nei SAN del certificato self-signed (il microfono del browser
 # richiede HTTPS da altri dispositivi).
-name: SqueezeSay
-version: "0.1.0"
-slug: squeezesay
-description: Controllo vocale in italiano per LMS/Squeezebox/Daphile, TIDAL incluso
-url: https://github.com/LucaBon/squeezesay
+#
+# NOTA rebrand: lo slug è cambiato da "squeezesay" a "vivavoce", quindi per
+# il Supervisor questo è un add-on NUOVO — chi aveva il vecchio deve
+# disinstallarlo e installare questo (vedi CHANGELOG).
+name: Vivavoce
+version: "0.2.0"
+slug: vivavoce
+description: Controllo vocale in italiano/inglese per LMS/Squeezebox/Daphile, TIDAL e Qobuz inclusi
+url: https://github.com/LucaBon/vivavoce
 arch:
   - amd64
   - aarch64

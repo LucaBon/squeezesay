@@ -1,4 +1,4 @@
-# SqueezeSay — web app vocale locale. Avvio in un comando:
+# Vivavoce — web app vocale locale. Avvio in un comando:
 #
 #   docker compose up -d
 #
@@ -9,26 +9,30 @@
 # l'auto-discovery UDP di LMS sia il certificato con gli IP giusti nei SAN,
 # quindi di norma NON serve configurare nulla.
 services:
-  squeezesay:
+  vivavoce:
     build: .
-    container_name: squeezesay
+    container_name: vivavoce
     network_mode: host
     restart: unless-stopped
     volumes:
-      - squeezesay-data:/data   # certificato TLS persistente (accetti l'avviso una volta sola)
+      # Certificato TLS, licenza Pro e kid-safe persistenti. Il nome interno
+      # del volume resta quello storico: un rename lo orfanerebbe, perdendo
+      # certificato e attivazione della licenza degli utenti esistenti.
+      - squeezesay-data:/data
     environment:
-      SQUEEZESAY_PORT: "8730"
-      # Tutte opzionali — decommenta solo ciò che ti serve:
-      # SQUEEZESAY_LMS: "http://192.168.1.50:9000"   # se omesso: auto-discovery sulla LAN
-      # SQUEEZESAY_PLAYER: "aa:bb:cc:dd:ee:ff"       # se omesso: il primo player trovato
-      # SQUEEZESAY_MATERIAL_URL: "http://192.168.1.50:9000/material/"
-      # SQUEEZESAY_HTTPS: "0"                        # solo HTTP: mic solo su localhost
-      # SQUEEZESAY_CERT_HOSTS: "192.168.1.20"        # SAN extra nel certificato (vedi sotto)
+      VIVAVOCE_PORT: "8730"
+      # Tutte opzionali — decommenta solo ciò che ti serve (i vecchi nomi
+      # SQUEEZESAY_* funzionano ancora per un rilascio, con un avviso):
+      # VIVAVOCE_LMS: "http://192.168.1.50:9000"   # se omesso: auto-discovery sulla LAN
+      # VIVAVOCE_PLAYER: "aa:bb:cc:dd:ee:ff"       # se omesso: il primo player trovato
+      # VIVAVOCE_MATERIAL_URL: "http://192.168.1.50:9000/material/"
+      # VIVAVOCE_HTTPS: "0"                        # solo HTTP: mic solo su localhost
+      # VIVAVOCE_CERT_HOSTS: "192.168.1.20"        # SAN extra nel certificato (vedi sotto)
 
     # --- Docker Desktop (Windows/Mac) o reti bridge ---------------------------
     # `network_mode: host` lì non espone davvero la LAN: commentalo, decommenta
-    # `ports`, e imposta esplicitamente SQUEEZESAY_LMS (l'auto-discovery UDP non
-    # attraversa il bridge) e SQUEEZESAY_CERT_HOSTS con l'IP LAN dell'host (il
+    # `ports`, e imposta esplicitamente VIVAVOCE_LMS (l'auto-discovery UDP non
+    # attraversa il bridge) e VIVAVOCE_CERT_HOSTS con l'IP LAN dell'host (il
     # container vede solo il proprio IP interno, non quello che userà il telefono).
     # ports:
     #   - "8730:8730"

@@ -1,4 +1,4 @@
-// Service worker minimale per la PWA SqueezeSay.
+// Service worker minimale per la PWA Vivavoce.
 //
 // Strategia: network-first per la pagina (un aggiornamento del server arriva
 // subito; la cache serve solo da fallback offline per l'apertura dell'app),
@@ -8,7 +8,7 @@
 // Nota: Chrome registra il service worker solo su HTTPS *fidato* — quindi con
 // la CA locale installata (vedi /ca.pem), non con il certificato "accettato
 // nonostante l'avviso".
-const VERSION = "squeezesay-v4";
+const VERSION = "vivavoce-v5";
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 // Endpoint dinamici: mai in cache (lo stato del player cambia di continuo).
 const NETWORK_ONLY = ["/nowplaying", "/artwork"];

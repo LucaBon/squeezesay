@@ -198,7 +198,7 @@ DEFAULT_LANG = "it"
 # context; our HTTP server is thread-per-request).
 import contextvars as _contextvars
 
-_current_lang = _contextvars.ContextVar("squeezesay_lang", default=DEFAULT_LANG)
+_current_lang = _contextvars.ContextVar("vivavoce_lang", default=DEFAULT_LANG)
 
 
 def set_lang(lang: str) -> None:

@@ -5,7 +5,7 @@ The browser microphone (Web Speech API) needs a secure context (HTTPS) when the
 page is opened from another device (e.g. your phone). This creates in the target
 directory (default: the repo root):
 
-- ``ca.pem`` / ``ca-key.pem`` — a private "SqueezeSay Local CA", created once and
+- ``ca.pem`` / ``ca-key.pem`` — a private "Vivavoce Local CA", created once and
   **reused** on later runs. Install ``ca.pem`` once on your phone/PC and the
   browser trusts the server for good: green lock, no warning, and the service
   worker/PWA install work (Chrome refuses service workers on untrusted certs,
@@ -83,7 +83,7 @@ def _load_or_create_ca(out_dir: str):
         return ca_cert, ca_key, False
 
     ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "SqueezeSay Local CA")])
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Vivavoce Local CA")])
     ca_cert = (
         x509.CertificateBuilder()
         .subject_name(name)
@@ -159,7 +159,7 @@ def main() -> int:
         except ValueError:
             sans.append(x509.DNSName(host))  # non è un IP: lo trattiamo come nome DNS
 
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "impianto-locale")])
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "vivavoce-locale")])
     cert = (
         x509.CertificateBuilder()
         .subject_name(name)

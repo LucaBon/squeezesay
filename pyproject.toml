@@ -1,7 +1,7 @@
 [project]
-name = "squeezesay"
-version = "0.1.0"
-description = "Hands-free voice control for a Daphile/LMS hi-fi (and TIDAL), in Italian."
+name = "vivavoce"
+version = "0.2.0"
+description = "Vivavoce — hands-free voice control for a Daphile/LMS hi-fi (TIDAL and Qobuz included), in Italian and English."
 readme = "README.md"
 # Open-core: tutto AGPL-3.0 tranne localvoice/pro/ (vedi licenses/README.md).
 license = "AGPL-3.0-only"
