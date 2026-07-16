@@ -103,8 +103,23 @@
         background: var(--surface); border: 1px solid var(--border);
         border-radius: 999px; padding: .28rem .32rem; box-shadow: var(--shadow); }
   .prolock { font-size: .8em; opacity: .85; }
-  #probox { width: 100%; border-top: 1px solid var(--border);
+  #probox, #kidsafebox { width: 100%; border-top: 1px solid var(--border);
             margin-top: .4rem; padding-top: .55rem; }
+  #ksstatus { text-align: left; }
+  #ksstatus .lamp { display: inline-block; width: .55em; height: .55em;
+            border-radius: 50%; margin-right: .4em; vertical-align: baseline;
+            background: var(--brand-strong); box-shadow: 0 0 6px var(--brand-strong); }
+  #ksrow, #ksaddrow { margin-top: .45rem; max-width: none; }
+  #ksterms { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+  #ksterms .choice { border-color: var(--danger); background: var(--danger-soft); }
+  #ksbuttons { display: flex; gap: .5rem; margin-top: .5rem; }
+  #ksbuttons button { background: var(--surface); color: var(--text-muted);
+            border: 1px solid var(--border); border-radius: var(--radius-s);
+            padding: .45rem .7rem; cursor: pointer; min-height: 40px; }
+  #ksbuttons button:hover { border-color: var(--brand-border); }
+  #kschip { font-family: var(--font-label); font-size: .68rem;
+            text-transform: uppercase; letter-spacing: .08em;
+            color: var(--amber-text); }
   #prostatus { text-align: left; }
   #prostatus b { color: var(--accent-text); }
   #prostatus.warn b { color: var(--danger); }
@@ -240,6 +255,7 @@
             aria-pressed="false" aria-label="Tieni premuto o clicca e parla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/><path d="M8.5 21h7"/></svg></button>
     <div id="micstate" class="hint" aria-hidden="true" data-i18n="micstate_idle">tocca e parla</div>
     <div id="status" class="hint" role="status" aria-live="polite">Tocca il microfono e parla, oppure scrivi qui sotto.</div>
+    <div id="kschip" style="display:none" data-i18n="ks_chip">🧒 kid-safe attivo</div>
     <div class="row">
       <label for="text" class="sr-only" data-i18n="lbl_text">Comando testuale</label>
       <input id="text" placeholder="es. riproduci Time dei Pink Floyd" autocomplete="off"
@@ -297,6 +313,24 @@
         </div>
         <a class="hint" id="probuy" target="_blank" rel="noopener" href="#"
            data-i18n="pro_buy" style="display:inline-block; margin-top:.35rem">Acquista la licenza Pro ↗</a>
+      </div>
+      <div id="kidsafebox" style="display:none">
+        <div id="ksstatus" class="hint"></div>
+        <div class="row" id="ksrow">
+          <label for="kspin" class="sr-only" data-i18n="ks_pin_lbl">PIN kid-safe</label>
+          <input id="kspin" type="password" inputmode="numeric" autocomplete="off">
+          <button class="send" id="ksgo" type="button">Attiva</button>
+        </div>
+        <div id="ksterms"></div>
+        <div class="row" id="ksaddrow">
+          <label for="ksterm" class="sr-only" data-i18n="ks_add_lbl">Termine da bloccare</label>
+          <input id="ksterm" autocomplete="off">
+          <button class="send" id="ksadd" type="button" data-i18n="ks_add">Blocca</button>
+        </div>
+        <div id="ksbuttons">
+          <button id="kslock" type="button" data-i18n="ks_lock">🔒 Richiudi</button>
+          <button id="ksdisable" type="button" data-i18n="ks_disable">Disattiva</button>
+        </div>
       </div>
     </div>
     <details class="hint" id="voicepanel" style="display:none; margin-top:.5rem">
@@ -506,6 +540,25 @@ const UI_EN = {
   pro_err_network: "Couldn't reach the license server. Check the connection and try again.",
   pro_err_invalid: "Key not valid (or activation limit reached): ",
   pro_only: " — Pro feature",
+  ks_chip: "🧒 kid-safe on",
+  ks_pin_lbl: "Kid-safe PIN",
+  ks_add_lbl: "Term to block",
+  ks_add: "Block",
+  ks_lock: "🔒 Re-lock",
+  ks_disable: "Turn off",
+  ks_pitch: "<b>🧒 Kid-safe</b> — block songs or artists: blocked requests are refused " +
+    "on every device, by voice too (“block …”, “unblock …”). PIN-protected.",
+  ks_pin_new_ph: "choose a PIN (min 4)",
+  ks_pin_ph: "PIN",
+  ks_enable_btn: "Enable",
+  ks_unlock_btn: "Unlock",
+  ks_locked_line: "<b>🧒 Kid-safe on.</b> Enter the PIN to edit the list.",
+  ks_open_line: "<b>🧒 Kid-safe on</b> — unlocked on this device. Tap a term to unblock it.",
+  ks_empty: "No blocked terms yet.",
+  ks_wrong_pin: "Wrong PIN (after 5 tries, wait a minute).",
+  ks_pin_short: "PIN too short: at least 4 characters.",
+  ks_revoked_note: "License not active: the blocklist keeps being enforced, but " +
+    "changes are locked.",
 };
 // Italian counterparts of the dynamic strings (the labels come from the markup).
 const UI_IT = {
@@ -543,6 +596,24 @@ const UI_IT = {
   pro_err_network: "Non raggiungo il server delle licenze. Controlla la connessione e riprova.",
   pro_err_invalid: "Chiave non valida (o limite attivazioni raggiunto): ",
   pro_only: " — funzione Pro",
+  ks_chip: "🧒 kid-safe attivo",
+  ks_pin_lbl: "PIN kid-safe",
+  ks_add_lbl: "Termine da bloccare",
+  ks_add: "Blocca",
+  ks_lock: "🔒 Richiudi",
+  ks_disable: "Disattiva",
+  ks_pitch: "<b>🧒 Kid-safe</b> — blocca brani o artisti: le richieste bloccate vengono " +
+    "rifiutate su ogni dispositivo, anche a voce («blocca …», «sblocca …»). Protetto da PIN.",
+  ks_pin_new_ph: "scegli un PIN (min 4)",
+  ks_pin_ph: "PIN",
+  ks_enable_btn: "Attiva",
+  ks_unlock_btn: "Sblocca",
+  ks_locked_line: "<b>🧒 Kid-safe attivo.</b> Inserisci il PIN per modificare la lista.",
+  ks_open_line: "<b>🧒 Kid-safe attivo</b> — sbloccato su questo dispositivo. Tocca un termine per sbloccarlo.",
+  ks_empty: "Nessun termine bloccato, per ora.",
+  ks_wrong_pin: "PIN errato (dopo 5 tentativi, aspetta un minuto).",
+  ks_pin_short: "PIN troppo corto: almeno 4 caratteri.",
+  ks_revoked_note: "Licenza non attiva: la lista resta applicata, ma le modifiche sono bloccate.",
 };
 const IT_MARKUP = {};  // Italian innerHTML of every [data-i18n], snapshotted at load
 document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -585,6 +656,7 @@ function applyUI() {
   buildSourceOptions();
   buildVoicePickers();  // re-localizes the "(no voice)" option
   applyPro();           // re-localizes the Pro panel strings
+  renderKidsafe();      // re-localizes the kid-safe panel
   refreshStatus();
 }
 
@@ -792,6 +864,106 @@ $("proact").onclick = async () => {
     $("proact").disabled = false;
   }
 };
+
+// --- Kid-safe panel (Pro, server-enforced): state comes from /kidsafe. ---
+let KS = null;
+
+function renderKidsafe() {
+  const box = $("kidsafebox");
+  if (!KS) { box.style.display = "none"; $("kschip").style.display = "none"; return; }
+  box.style.display = "";
+  $("kschip").style.display = KS.enabled ? "" : "none";
+  const st = $("ksstatus");
+  const unlocked = KS.enabled && !KS.locked;
+  // status line + which controls show
+  if (!KS.enabled) {
+    st.innerHTML = ui("ks_pitch") + (KS.pro ? "" :
+      ' <span class="warn">' + ui("pro_only").replace(/^ — /, "") + "</span>");
+    $("kspin").placeholder = KS.haspin ? ui("ks_pin_ph") : ui("ks_pin_new_ph");
+    $("ksgo").textContent = ui("ks_enable_btn");
+    $("ksrow").style.display = "";
+  } else if (KS.locked) {
+    st.innerHTML = '<span class="lamp"></span>' + ui("ks_locked_line") +
+      (KS.pro ? "" : ' <span class="warn">' + ui("ks_revoked_note") + "</span>");
+    $("kspin").placeholder = ui("ks_pin_ph");
+    $("ksgo").textContent = ui("ks_unlock_btn");
+    $("ksrow").style.display = "";
+  } else {
+    st.innerHTML = '<span class="lamp"></span>' + ui("ks_open_line");
+    $("ksrow").style.display = "none";
+  }
+  $("ksaddrow").style.display = unlocked ? "" : "none";
+  $("ksbuttons").style.display = unlocked ? "" : "none";
+  const terms = $("ksterms");
+  terms.innerHTML = "";
+  terms.style.display = unlocked ? "" : "none";
+  if (unlocked) {
+    if (!(KS.terms || []).length) {
+      terms.innerHTML = '<span class="hint">' + ui("ks_empty") + "</span>";
+    } else {
+      KS.terms.forEach(term => {
+        const chip = document.createElement("button");
+        chip.className = "choice";
+        chip.textContent = term + "  ✕";
+        chip.onclick = () => ksAction("remove", { term });
+        terms.appendChild(chip);
+      });
+    }
+  }
+}
+
+async function ksAction(action, extra) {
+  try {
+    const r = await fetch("/kidsafe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ client: clientId(), action }, extra || {}))
+    });
+    const d = await r.json();
+    KS = d;
+    renderKidsafe();
+    if (!d.ok) {
+      const st = $("ksstatus");
+      if (d.error === "pro_required") { showProUpsell(); }
+      else if (d.error === "wrong_pin") {
+        st.innerHTML += ' <span class="warn">' + ui("ks_wrong_pin") + "</span>";
+      } else if (d.error === "pin_too_short") {
+        st.innerHTML += ' <span class="warn">' + ui("ks_pin_short") + "</span>";
+      }
+    }
+    return d;
+  } catch (e) { return null; }
+}
+
+async function refreshKidsafe() {
+  try {
+    const r = await fetch("/kidsafe?client=" + encodeURIComponent(clientId()));
+    KS = await r.json();
+  } catch (e) { KS = null; }
+  renderKidsafe();
+}
+
+$("ksgo").onclick = async () => {
+  const pin = $("kspin").value;
+  if (!KS) return;
+  if (!KS.enabled && !PRO) { showProUpsell(); return; }
+  const d = await ksAction(KS.enabled ? "unlock" : "enable", { pin });
+  if (d && d.ok) $("kspin").value = "";
+};
+$("kspin").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("ksgo").click();
+});
+$("ksadd").onclick = async () => {
+  const term = $("ksterm").value.trim();
+  if (!term) return;
+  const d = await ksAction("add", { term });
+  if (d && d.ok) $("ksterm").value = "";
+};
+$("ksterm").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("ksadd").click();
+});
+$("kslock").onclick = () => ksAction("lock");
+$("ksdisable").onclick = () => ksAction("disable");
 
 // --- wake-word field (used by the recogniser below) ---
 const wakeWord = () => ($("wakeword").value || "impianto").trim();
@@ -1102,6 +1274,7 @@ applyUI();
 // Ask the server for the real license state (the localStorage hint bridges
 // the gap and offline opens).
 refreshLicense();
+refreshKidsafe();
 
 // First-ever visit: open the settings panel so language and source get noticed.
 if (!localStorage.getItem("reclang") && !localStorage.getItem("source")) {

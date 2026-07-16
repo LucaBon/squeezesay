@@ -97,6 +97,13 @@ def main():
             page.evaluate("setPro({pro: true, key: '****ABCD'})")
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"06-pro-active-{scheme}.png")
+            # Kid-safe: unlocked parent view with a couple of blocked terms.
+            page.evaluate(
+                "KS = {pro: true, enabled: true, haspin: true, locked: false,"
+                " terms: ['Bad Song', 'Explicit Artist']}; renderKidsafe();"
+                " document.getElementById('kidsafebox').scrollIntoView();")
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"07-kidsafe-{scheme}.png")
             ctx.close()
         browser.close()
     print("done ->", OUT)

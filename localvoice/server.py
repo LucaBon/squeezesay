@@ -119,7 +119,8 @@ def _http_fetch(url: str, timeout: float = 5.0):
 
 
 def make_handler(lms, material_url: str, services, default_service: str,
-                 ca_path=None, artwork_fetch=_http_fetch, license_mgr=None):
+                 ca_path=None, artwork_fetch=_http_fetch, license_mgr=None,
+                 kidsafe=None):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
     # two phones don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
@@ -132,7 +133,8 @@ def make_handler(lms, material_url: str, services, default_service: str,
             r = routers.get(client_id)
             if r is None:
                 r = Router(lms, default_service=default_service,
-                           services=tuple(services))
+                           services=tuple(services),
+                           kidsafe=kidsafe, client_id=client_id)
                 routers[client_id] = r
             return r
 
@@ -165,8 +167,64 @@ def make_handler(lms, material_url: str, services, default_service: str,
             elif self.path == "/license":
                 status = license_mgr.status() if license_mgr else {"pro": False}
                 self._send(200, json.dumps(status))
+            elif self.path.startswith("/kidsafe"):
+                self._kidsafe_status()
             else:
                 self._send(404, "not found", "text/plain")
+
+        def _kidsafe_state(self, client_id: str) -> dict:
+            state = {
+                "pro": kidsafe.pro_ok(),
+                "enabled": kidsafe.enabled(),
+                "haspin": kidsafe.has_pin(),
+                "locked": not kidsafe.is_unlocked(client_id),
+            }
+            if not state["locked"]:
+                # I termini si vedono solo da sbloccati: un bambino non deve
+                # poter leggere la lista per aggirarla.
+                state["terms"] = kidsafe.terms()
+            return state
+
+        def _kidsafe_status(self):
+            if not kidsafe:
+                self._send(200, json.dumps({"pro": False, "enabled": False}))
+                return
+            from urllib.parse import parse_qs, urlparse
+            query = parse_qs(urlparse(self.path).query)
+            client_id = (query.get("client") or ["default"])[0]
+            self._send(200, json.dumps(self._kidsafe_state(client_id)))
+
+        def _kidsafe_action(self):
+            if not kidsafe:
+                self._send(200, json.dumps(
+                    {"ok": False, "error": "unavailable"}))
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                payload = {}
+            client_id = payload.get("client") or "default"
+            action = payload.get("action") or ""
+            pin = payload.get("pin") or ""
+            term = payload.get("term") or ""
+            if action == "unlock":
+                result = ({"ok": True} if kidsafe.unlock(client_id, pin)
+                          else {"ok": False, "error": "wrong_pin"})
+            elif action == "lock":
+                kidsafe.lock(client_id)
+                result = {"ok": True}
+            elif action == "enable":
+                result = kidsafe.enable(pin, client_id)
+            elif action == "disable":
+                result = kidsafe.disable(client_id)
+            elif action in ("add", "remove"):
+                result = kidsafe.edit_terms(action, term, client_id)
+            else:
+                result = {"ok": False, "error": "unknown_action"}
+            result.update(self._kidsafe_state(client_id))
+            self._send(200, json.dumps(result, ensure_ascii=False))
 
         def _activate_license(self):
             # Attivazione una tantum dalla UI impostazioni. Server solo LAN:
@@ -227,6 +285,9 @@ def make_handler(lms, material_url: str, services, default_service: str,
         def do_POST(self):
             if self.path == "/license":
                 self._activate_license()
+                return
+            if self.path == "/kidsafe":
+                self._kidsafe_action()
                 return
             if self.path != "/command":
                 self._send(404, '{"speech":"non trovato"}')
@@ -296,6 +357,8 @@ def main() -> int:
     data_dir = appdata.data_dir(args.data_dir)
     license_mgr = licensing.LicenseManager(data_dir)
     license_mgr.revalidate_async()  # settimanale, best-effort, mai bloccante
+    from pro.kidsafe import KidSafe
+    kidsafe = KidSafe(data_dir, license_mgr)
 
     lms_url = args.lms
     if not lms_url:
@@ -363,7 +426,8 @@ def main() -> int:
     httpd = ThreadingHTTPServer(
         (args.host, args.port),
         make_handler(client, material_url, services, default_service,
-                     ca_path=ca_path, license_mgr=license_mgr),
+                     ca_path=ca_path, license_mgr=license_mgr,
+                     kidsafe=kidsafe),
     )
 
     scheme = "http"

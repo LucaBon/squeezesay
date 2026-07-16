@@ -102,6 +102,12 @@ PATTERNS = {
                      r"|(?:tutte\s+le\s+|le\s+|i\s+)?(?:canzoni|brani)\s+"
                      r"(?:di|dei|degli|delle|del|della|dell['’]))\s+(.+)$"),
         "generic_play": _c(r"(?:riproduci|metti|suona|fai partire|voglio ascoltare)\s+(.+)$"),
+        # Kid-safe: anchored on the verb at string start, so a title containing
+        # the word ("metti Block Rockin' Beats") still routes as a play.
+        "block_add": _c(r"^blocca\s+(.+)$"),
+        "block_remove": _c(r"^sblocca\s+(.+)$"),
+        "block_list": _c(r"^(?:(?:quali|che)\s+(?:brani|canzoni)\s+sono\s+bloccat|"
+                         r"cosa\s+(?:è|e)\s+bloccat|lista\s+(?:dei\s+)?bloccat)"),
     },
     "en": {
         # ``put`` alone (not just "put on") so the suffix form "put X on" is
@@ -146,6 +152,12 @@ PATTERNS = {
                            r"|i\s+want\s+to\s+(?:hear|listen\s+to))\s+(.+)$"),
         # Suffix form: "put Dark Side of the Moon on"
         "generic_play_suffix": _c(r"^put\s+(.+?)\s+on\s*$"),
+        # Kid-safe: anchored on the verb at string start, so a title containing
+        # the word ("play Block Rockin' Beats") still routes as a play.
+        "block_add": _c(r"^block\s+(.+)$"),
+        "block_remove": _c(r"^unblock\s+(.+)$"),
+        "block_list": _c(r"^(?:(?:what|which)\s+(?:songs?|tracks?)\s+(?:are|is)\s+blocked|"
+                         r"what'?s\s+blocked|list\s+(?:the\s+)?blocked)"),
     },
 }
 
@@ -186,12 +198,18 @@ def _source_suffix(name) -> str:
 
 
 class Router:
-    def __init__(self, lms, default_service="tidal", services=("tidal", "qobuz")):
+    def __init__(self, lms, default_service="tidal", services=("tidal", "qobuz"),
+                 kidsafe=None, client_id="default"):
         self.lms = lms
         # Streaming sources this router accepts as a ``source`` value; anything
         # else streams from ``default_service`` (also the "auto" fallback).
         self.default_service = default_service
         self.services = tuple(services)
+        # Kid-safe (Pro): one Router per browser/client, so the guard state is
+        # per-client too. None (the default) keeps everything transparent.
+        self.kidsafe = kidsafe
+        self.client_id = client_id
+        self._guard = None  # computed per handle() call
         self.candidates = None  # candidates from the last list command
         # Where those candidates play from ('local' or a service name), so a
         # follow-up pick's confirmation can say the source too.
@@ -238,19 +256,22 @@ class Router:
         return result
 
     def _resolve(self, arg: str, stream_fn, source: str):
+        guard = self._guard
         if source == "local":
-            return self._played(actions.play_local(self.lms, arg), "local")
+            return self._played(
+                actions.play_local(self.lms, arg, guard=guard), "local")
         name = self._stream_name(source)
         stream = self.lms.for_service(name)
         if source == "auto":
             # Auto: prefer a confident local-library hit, else fall back to the
             # default streaming service (no cascading across services).
             # play_local only plays when it matches, so a miss has no effect.
-            res = actions.play_local(self.lms, arg)
+            res = actions.play_local(self.lms, arg, guard=guard)
             if getattr(res, "ok", False):
                 return self._played(res, "local")
-        return self._played(self._tag(stream_fn(stream, arg), _source_suffix(name)),
-                            name)
+        return self._played(
+            self._tag(stream_fn(stream, arg, guard=guard), _source_suffix(name)),
+            name)
 
     def handle_many(self, alternatives, source: str = "tidal", lang: str = "it") -> dict:
         """Try each speech-recognition alternative until one is a hit.
@@ -307,6 +328,32 @@ class Router:
         if not t:
             return msg("heard_nothing")
 
+        # Kid-safe guard for this request: restrictive only when the feature is
+        # enabled and this client isn't PIN-unlocked. Recomputed per turn so an
+        # unlock/lock takes effect immediately.
+        self._guard = (self.kidsafe.guard_for(self.client_id)
+                       if self.kidsafe else None)
+
+        # 0) kid-safe voice management (Pro; list/edit gated on the PIN unlock).
+        if self.kidsafe:
+            m = (P["block_add"].match(t) or P["block_remove"].match(t)
+                 or P["block_list"].match(t))
+            if m:
+                if not self.kidsafe.pro_ok():
+                    return msg("pro_required")
+                is_owner = self.kidsafe.is_unlocked(self.client_id)
+                if P["block_add"].match(t):
+                    return actions.add_block(
+                        self.kidsafe.store,
+                        P["block_add"].match(t).group(1).strip(),
+                        is_owner=is_owner)
+                if P["block_remove"].match(t):
+                    return actions.remove_block(
+                        self.kidsafe.store,
+                        P["block_remove"].match(t).group(1).strip(),
+                        is_owner=is_owner)
+                return actions.list_blocks(self.kidsafe.store, is_owner=is_owner)
+
         # A play command carries a title after the verb; its transport-sounding
         # words ("Don't Stop Me Now" -> "stop") must NOT be mistaken for
         # transport controls, or the song is never played. "in pausa"/"on pause"
@@ -342,7 +389,8 @@ class Router:
             bare = re.match(r"([a-z0-9]+)\s*$", t, re.I)
             number = _as_number(bare.group(1), ordinals=True) if bare else None
         if number is not None:
-            return self._tag(actions.choose_from(self.lms, self.candidates, number),
+            return self._tag(actions.choose_from(self.lms, self.candidates, number,
+                                                 guard=self._guard),
                              _source_suffix(self.cand_source))
 
         # 3) explicit source override phrases (win over the selector). Service
@@ -350,25 +398,30 @@ class Router:
         # selector.
         m = P["local_prefix"].search(t)
         if m:
-            return self._played(actions.play_local(self.lms, m.group(1).strip()), "local")
+            return self._played(actions.play_local(self.lms, m.group(1).strip(),
+                                                   guard=self._guard), "local")
         m = P["local_suffix"].search(t)
         if m:
-            return self._played(actions.play_local(self.lms, m.group(1).strip()), "local")
+            return self._played(actions.play_local(self.lms, m.group(1).strip(),
+                                                   guard=self._guard), "local")
         for service in self.services:
             m = re.search(P["service"].format(s=_service_re(service)), t, re.I)
             if m:
-                res = actions.play_song(self.lms.for_service(service), m.group(1).strip())
+                res = actions.play_song(self.lms.for_service(service),
+                                        m.group(1).strip(), guard=self._guard)
                 return self._played(self._tag(res, _source_suffix(service)), service)
 
         # 4) lists that open a numbered choice
         m = P["albums_list"].search(t)
         if m:  # "quali album ho di X" / "which albums do I have by X" -> local
             return self._remember(
-                actions.local_albums_list(self.lms, m.group(1).strip()), "local")
+                actions.local_albums_list(self.lms, m.group(1).strip(),
+                                          guard=self._guard), "local")
         m = P["toptracks"].search(t)
         if m:  # top tracks -> streaming (selected or default service)
             return self._remember(
-                actions.top_tracks_list(self._stream(source), m.group(1).strip()),
+                actions.top_tracks_list(self._stream(source), m.group(1).strip(),
+                                        guard=self._guard),
                 self._stream_name(source))
 
         # 4b) name-based choice from the last read-out list (only while a list is
@@ -380,7 +433,8 @@ class Router:
             m = P["name_pick"].match(t)
             if m:
                 chosen = actions.choose_by_name(
-                    self.lms, self.candidates, m.group(1).strip()
+                    self.lms, self.candidates, m.group(1).strip(),
+                    guard=self._guard
                 )
                 if chosen is not None:
                     return self._tag(chosen, _source_suffix(self.cand_source))
@@ -395,7 +449,8 @@ class Router:
         if m:
             name = self._stream_name(source)
             return self._tag(
-                actions.play_playlist(self.lms.for_service(name), m.group(1).strip()),
+                actions.play_playlist(self.lms.for_service(name),
+                                      m.group(1).strip(), guard=self._guard),
                 _source_suffix(name))
 
         # 7) artist — streaming or local per selector
