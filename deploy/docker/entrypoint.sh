@@ -12,7 +12,9 @@ PORT="${SQUEEZESAY_PORT:-8730}"
 
 mkdir -p "$DATA_DIR"
 
-set -- --host 0.0.0.0 --port "$PORT"
+# Lo stato persistente del server (licenza, kid-safe) vive nello stesso
+# volume del certificato.
+set -- --host 0.0.0.0 --port "$PORT" --data-dir "$DATA_DIR"
 
 # HTTPS attivo di default: senza, il microfono del browser funziona solo su
 # localhost e il container non servirebbe a molto. SQUEEZESAY_HTTPS=0 per HTTP.

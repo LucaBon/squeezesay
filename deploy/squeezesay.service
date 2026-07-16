@@ -14,7 +14,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/squeezesay
 ExecStart=/opt/squeezesay/.venv/bin/python localvoice/server.py \
-    --cert /opt/squeezesay/cert.pem --key /opt/squeezesay/key.pem
+    --cert /opt/squeezesay/cert.pem --key /opt/squeezesay/key.pem \
+    --data-dir /opt/squeezesay/data
 Restart=on-failure
 RestartSec=5
 

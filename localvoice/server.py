@@ -30,6 +30,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "engine"))  # actions, lms
 sys.path.insert(0, HERE)  # router
 
+import appdata  # noqa: E402
 import discovery  # noqa: E402
 from lms import SERVICES, LMSClient, LMSError  # noqa: E402
 from messages import msg  # noqa: E402
@@ -188,26 +189,36 @@ def make_handler(lms, material_url: str, services, default_service: str,
 
 
 def main() -> int:
+    # Ogni opzione ha un gemello d'ambiente (PREFIX_LMS, PREFIX_PORT, ...):
+    # Docker/HA configurano via env, la riga di comando vince quando presente.
     ap = argparse.ArgumentParser(description="Server vocale locale per LMS/Daphile.")
-    ap.add_argument("--lms", help="es. http://192.168.1.50:9000 "
-                                  "(auto-rilevato sulla rete se omesso)")
-    ap.add_argument("--player", help="MAC del player; default: il primo trovato")
+    ap.add_argument("--lms", default=appdata.env("LMS"),
+                    help="es. http://192.168.1.50:9000 "
+                         "(auto-rilevato sulla rete se omesso)")
+    ap.add_argument("--player", default=appdata.env("PLAYER"),
+                    help="MAC del player; default: il primo trovato")
     ap.add_argument("--host", default="0.0.0.0")
-    ap.add_argument("--port", type=int, default=8730)
+    ap.add_argument("--port", type=int, default=int(appdata.env("PORT", "8730")))
     ap.add_argument("--cert", help="certificato TLS (per il mic da altri device)")
     ap.add_argument("--key", help="chiave TLS")
-    ap.add_argument("--material-url",
+    ap.add_argument("--data-dir", default=None,
+                    help="cartella per lo stato persistente del server "
+                         "(licenza, kid-safe). Default: PREFIX_DATA_DIR, poi "
+                         "%%APPDATA%% su Windows o ~/.local/share altrove.")
+    ap.add_argument("--material-url", default=appdata.env("MATERIAL_URL"),
                     help="URL della UI da aprire col link 'Material Skin'. "
                          "Default: <lms>/material/ . Se Material Skin non è "
                          "installato, punta alla UI classica (es. <lms>/).")
-    ap.add_argument("--services", default="auto",
+    ap.add_argument("--services", default=appdata.env("SERVICES", "auto"),
                     help="servizi streaming offerti nel selettore, es. "
                          "tidal,qobuz. Default 'auto': rileva i plugin "
                          "installati sull'LMS (fallback: tidal).")
-    ap.add_argument("--default-service", default="tidal",
+    ap.add_argument("--default-service",
+                    default=appdata.env("DEFAULT_SERVICE", "tidal"),
                     help="servizio streaming usato in modalità automatica e "
                          "quando la frase non ne nomina uno (default: tidal)")
     args = ap.parse_args()
+    data_dir = appdata.data_dir(args.data_dir)
 
     lms_url = args.lms
     if not lms_url:
