@@ -32,6 +32,26 @@ The app is a **local web app** (`localvoice/`) over a tested engine
 (`engine/actions.py` + `engine/lms.py`): a browser mic/text page on your LAN
 that talks straight to LMS. No cloud, no account.
 
+## Free and Pro
+
+The core is free and open source (AGPL-3.0), forever. A one-time **Pro
+license** — **11,90 €** per household (**8,90 €** at launch), no subscription —
+unlocks the hands-free features and funds development:
+
+| Free | Pro (one-time license) |
+|---|---|
+| Typed commands (the text box, works on every device over plain HTTP) | 🎙️ **Microphone** tap-to-talk |
+| All search & playback: local library, TIDAL, Qobuz, "did you mean" with tappable choices | 🪄 **Wake word** («vivavoce metti Time») |
+| Transport & volume, now-playing panel with artwork | 🌍 **Multilingual read-back voices** |
+| Docker / Home Assistant add-on / bare Python, HTTPS + PWA install | 🧒 **Kid-safe**: PIN-protected blocklist, enforced server-side on every device |
+| Updates | Future Pro features — and priority on your feedback |
+
+Activation is once, online, from the page settings (sold via Lemon Squeezy,
+which handles VAT/invoices); after that the license is cached locally and
+**works offline forever** — there is no phone-home requirement. The license
+check is deliberately simple and unobfuscated: the key is how you support the
+project ([the honest details](licenses/PRO-EULA.md)).
+
 ## Why it doesn't play the wrong song
 
 The whole point: *say a song and the exact song plays* — or you get an honest
@@ -141,9 +161,33 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
   opens lossless to the Connect API, a plugin path may become worth adding.
 - Bit-perfect: Vivavoce sends **only commands**; ensure LMS doesn't resample to the player.
 
+## Privacy, honestly
+
+- **Voice recognition happens in your browser** via the Web Speech API — which
+  means Chrome/Android sends the audio to **Google** and Safari/iOS to
+  **Apple** for transcription. That is the browser's doing, not ours, and we
+  say it plainly. If that bothers you, the **text box** is 100% local.
+- Everything else never leaves your LAN: commands go straight to your LMS,
+  there is no telemetry, no account, no analytics.
+- The only outbound calls the app ever makes: the **user-initiated** Pro
+  license activation, and an at-most-**weekly** license re-check (opt out with
+  `VIVAVOCE_NO_REVALIDATE=1`; going offline never disables a paid license).
+
+Full details in [PRIVACY.md](PRIVACY.md).
+
+## Support
+
+Best-effort via [GitHub Issues](https://github.com/LucaBon/vivavoce/issues) —
+one-author project, honest expectations in [SUPPORT.md](SUPPORT.md). Refunds
+for Pro follow the Lemon Squeezy 14-day policy.
+
 ## License
 
 Open-core. The engine, the web server and the free features are **AGPL-3.0**
 ([LICENSE](LICENSE)). The files under `localvoice/pro/` are proprietary,
 covered by the [Pro EULA](licenses/PRO-EULA.md) and unlocked by a one-time
 Pro license key. Details in [licenses/README.md](licenses/README.md).
+
+Contributions are welcome on the AGPL core; by opening a PR you agree to the
+Developer Certificate of Origin (sign-off), which keeps the open-core split
+legally clean.

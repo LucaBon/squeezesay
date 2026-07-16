@@ -1,0 +1,38 @@
+# Changelog
+
+## 0.2.0 — July 2026
+
+### SqueezeSay is now Vivavoce
+
+The project is renamed **Vivavoce** (Italian for "hands-free / speakerphone").
+"Squeeze-" echoed the Logitech Squeezebox trademark — the same reason the LMS
+project itself renamed to Lyrion. What this means for existing installs:
+
+| You use | What to do |
+|---|---|
+| Docker compose | `docker compose pull && docker compose up -d`. The data volume keeps its old internal name on purpose: your certificate (and license, see below) survive. Container/service are now called `vivavoce`. |
+| Env variables | New names are `VIVAVOCE_*`. The old `SQUEEZESAY_*` names keep working **for this release only**, printing a deprecation note. |
+| Home Assistant add-on | The add-on slug changed, so the Supervisor sees a **new add-on**: uninstall the old "SqueezeSay" one, add the repo again (`https://github.com/LucaBon/vivavoce`) and install **Vivavoce**. The old `/data` is not migrated — you'll re-accept the certificate once and re-enter your license key (this consumes one of your 5 activations). |
+| Windows autostart | Re-run `tools/install_autostart.ps1`; `tools/uninstall_autostart.ps1` cleans up both the old and the new task/firewall names. |
+| systemd | The unit is now `deploy/vivavoce.service`. |
+| Installed PWA | The app updates itself on the next online open; the icon label may show the old name until you reinstall it (cosmetic). |
+| Wake word | The default is now "vivavoce"; if you had saved a custom wake word (including "impianto"), it is preserved. |
+
+### New
+
+- **Now-playing panel** (free): artwork, title/artist/album, play/pause lamp
+  and elapsed bar, at the top of the page.
+- **Vivavoce Pro** — one-time license (11,90 €; launch price 8,90 €) that
+  unlocks the microphone, the wake word, the multilingual read-back voices and
+  kid-safe. Activation is once-online, then cached: offline never disables it.
+  The core stays free (text commands, all search/playback, transport) and is
+  now formally **AGPL-3.0** (the repo previously had no license).
+- **Kid-safe on the web app** (Pro): PIN-protected blocklist, enforced
+  server-side for every device on the LAN, editable by voice («blocca …»,
+  «sblocca …», «quali brani sono bloccati») or from settings.
+
+### Removed
+
+- **The Alexa skill.** It required an always-on HTTPS tunnel and a developer
+  account per household — unmaintainable, and the web app does the job
+  without any cloud. The engine lives on under `engine/` (was `lambda/`).
