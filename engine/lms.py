@@ -510,6 +510,46 @@ class LMSClient:
         item = loop[0]
         return {"title": item.get("title"), "artist": item.get("artist")}
 
+    def status_info(self) -> Dict[str, Any]:
+        """Player status for the web now-playing panel.
+
+        Returns mode (play/pause/stop), current track metadata, elapsed and
+        total seconds, and where the artwork lives: ``artwork`` is either an
+        LMS-relative path (local tracks: ``/music/<coverid>/cover.jpg``) or
+        the absolute URL the streaming plugin reported (``artwork_url``).
+        """
+        res = self.command("status", "-", "1", "tags:aAlKcdJ")
+        loop = res.get("playlist_loop") or []
+        item = loop[0] if loop else {}
+
+        artwork = item.get("artwork_url")
+        if artwork and not artwork.startswith(("http://", "https://", "/")):
+            artwork = "/" + artwork  # LMS a volte omette lo slash iniziale
+        if not artwork:
+            cover_id = item.get("coverid") or item.get("artwork_track_id")
+            if cover_id:
+                artwork = f"/music/{cover_id}/cover.jpg"
+            elif item:
+                # Fallback: la copertina del brano corrente del player, che
+                # l'LMS sa risolvere sia per tracce locali sia in streaming.
+                artwork = f"/music/current/cover.jpg?player={self.player_id}"
+
+        def _num(value: Any) -> Optional[float]:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        return {
+            "mode": res.get("mode") or "stop",
+            "title": item.get("title"),
+            "artist": item.get("artist"),
+            "album": item.get("album"),
+            "duration": _num(item.get("duration") or res.get("duration")),
+            "elapsed": _num(res.get("time")),
+            "artwork": artwork,
+        }
+
     # -- playback / controls ----------------------------------------------
     def play_url(self, url: str) -> Dict[str, Any]:
         """Play a direct URL (e.g. a track ``tidal://<id>.flc``) on the player."""

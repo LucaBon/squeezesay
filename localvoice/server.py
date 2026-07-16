@@ -109,8 +109,16 @@ def wait_for_players(lms_url: str, delay: float = 5.0, sleep=time.sleep) -> list
             sleep(delay)
 
 
+def _http_fetch(url: str, timeout: float = 5.0):
+    """GET ``url`` returning ``(content_type, bytes)`` — the artwork proxy's
+    default transport (injectable in tests)."""
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        return resp.headers.get("Content-Type") or "image/jpeg", resp.read()
+
+
 def make_handler(lms, material_url: str, services, default_service: str,
-                 ca_path=None):
+                 ca_path=None, artwork_fetch=_http_fetch):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
     # two phones don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
@@ -149,8 +157,50 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 # lucchetto verde e PWA installabile senza avvisi.
                 with open(ca_path, "rb") as f:
                     self._send(200, f.read(), "application/x-pem-file")
+            elif self.path.startswith("/nowplaying"):
+                self._send_nowplaying()
+            elif self.path.startswith("/artwork"):
+                self._send_artwork()
             else:
                 self._send(404, "not found", "text/plain")
+
+        def _send_nowplaying(self):
+            # Sempre 200: il pannello si nasconde su mode "unknown", niente
+            # spam di errori in console quando l'LMS è giù.
+            try:
+                info = lms.status_info()
+            except Exception:
+                self._send(200, json.dumps({"mode": "unknown"}))
+                return
+            if info.get("artwork"):
+                # Cache-buster: cambia col brano, così il browser non mostra
+                # la copertina precedente. L'URL vero lo risolve /artwork.
+                token = abs(hash((info["artwork"], info.get("title")))) % 10**8
+                info["artwork"] = f"/artwork?v={token}"
+            self._send(200, json.dumps(info, ensure_ascii=False))
+
+        def _send_artwork(self):
+            # Proxy lato server della copertina: la pagina è HTTPS e l'LMS è
+            # HTTP — un <img> diretto sarebbe mixed content (bloccato). Nessun
+            # parametro dal client: l'URL viene sempre ricavato qui dallo
+            # status del player, quindi niente open relay.
+            try:
+                art = lms.status_info().get("artwork")
+                if not art:
+                    self._send(404, "no artwork", "text/plain")
+                    return
+                if not art.startswith(("http://", "https://")):
+                    art = lms.base_url + art
+                ctype, data = artwork_fetch(art)
+            except Exception:
+                self._send(404, "artwork unavailable", "text/plain")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
 
         def do_POST(self):
             if self.path != "/command":

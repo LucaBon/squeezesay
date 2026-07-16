@@ -24,10 +24,42 @@ bubble("Volume impostato al 40%.", "sys");
 bubble("Non ho capito il comando.", "sys").classList.add("warn");
 """
 
+# Feed the now-playing panel directly (no LMS behind the static server).
+FILL_NOWPLAYING = """
+renderNowPlaying({mode: "play", title: "Wish You Were Here",
+                  artist: "Pink Floyd", album: "Wish You Were Here",
+                  duration: 334, elapsed: 128, artwork: "/icon-192.png"});
+"""
+
+
+class _Handler(http.server.SimpleHTTPRequestHandler):
+    """Static file server that fills the server-side placeholders: served raw,
+    ``const SERVICES = __SERVICES__;`` is a ReferenceError that kills every
+    script statement after it (settings, log, now-playing)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def do_GET(self):
+        if self.path in ("/", "/index.html"):
+            page = (ROOT / "index.html").read_text(encoding="utf-8")
+            page = page.replace("__SERVICES__", '["tidal", "qobuz"]')
+            page = page.replace("__MATERIAL_URL__", "#")
+            data = page.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        super().do_GET()
+
+    def log_message(self, *args):
+        pass
+
 
 def serve():
-    handler = lambda *a, **kw: http.server.SimpleHTTPRequestHandler(*a, directory=str(ROOT), **kw)
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), handler)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 
@@ -53,6 +85,10 @@ def main():
             page.evaluate("document.getElementById('mic').classList.add('listening')")
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"03-listening-{scheme}.png")
+            page.evaluate("document.getElementById('mic').classList.remove('listening')")
+            page.evaluate(FILL_NOWPLAYING)
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"04-nowplaying-{scheme}.png")
             ctx.close()
         browser.close()
     print("done ->", OUT)
