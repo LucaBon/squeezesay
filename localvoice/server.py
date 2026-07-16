@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)  # router
 
 import appdata  # noqa: E402
 import discovery  # noqa: E402
+import licensing  # noqa: E402
 from lms import SERVICES, LMSClient, LMSError  # noqa: E402
 from messages import msg  # noqa: E402
 from router import Router  # noqa: E402
@@ -118,7 +119,7 @@ def _http_fetch(url: str, timeout: float = 5.0):
 
 
 def make_handler(lms, material_url: str, services, default_service: str,
-                 ca_path=None, artwork_fetch=_http_fetch):
+                 ca_path=None, artwork_fetch=_http_fetch, license_mgr=None):
     # One Router (and thus its "metti la N" list state) per browser/client id, so
     # two phones don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
@@ -161,8 +162,29 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 self._send_nowplaying()
             elif self.path.startswith("/artwork"):
                 self._send_artwork()
+            elif self.path == "/license":
+                status = license_mgr.status() if license_mgr else {"pro": False}
+                self._send(200, json.dumps(status))
             else:
                 self._send(404, "not found", "text/plain")
+
+        def _activate_license(self):
+            # Attivazione una tantum dalla UI impostazioni. Server solo LAN:
+            # nessuna auth extra, come per /command.
+            if not license_mgr:
+                self._send(200, json.dumps(
+                    {"ok": False, "error": "unavailable"}))
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                key = json.loads(raw.decode("utf-8")).get("key", "")
+            except (ValueError, UnicodeDecodeError):
+                key = ""
+            result = license_mgr.activate(key)
+            if result.get("ok"):
+                result.update(license_mgr.status())
+            self._send(200, json.dumps(result))
 
         def _send_nowplaying(self):
             # Sempre 200: il pannello si nasconde su mode "unknown", niente
@@ -203,6 +225,9 @@ def make_handler(lms, material_url: str, services, default_service: str,
             self.wfile.write(data)
 
         def do_POST(self):
+            if self.path == "/license":
+                self._activate_license()
+                return
             if self.path != "/command":
                 self._send(404, '{"speech":"non trovato"}')
                 return
@@ -269,6 +294,8 @@ def main() -> int:
                          "quando la frase non ne nomina uno (default: tidal)")
     args = ap.parse_args()
     data_dir = appdata.data_dir(args.data_dir)
+    license_mgr = licensing.LicenseManager(data_dir)
+    license_mgr.revalidate_async()  # settimanale, best-effort, mai bloccante
 
     lms_url = args.lms
     if not lms_url:
@@ -336,7 +363,7 @@ def main() -> int:
     httpd = ThreadingHTTPServer(
         (args.host, args.port),
         make_handler(client, material_url, services, default_service,
-                     ca_path=ca_path),
+                     ca_path=ca_path, license_mgr=license_mgr),
     )
 
     scheme = "http"

@@ -94,6 +94,22 @@
              filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
   #mic:hover { filter: brightness(1.08); }
   #mic:active { transform: scale(.96); }
+  /* Free tier: the knob is visibly "off" (unpowered metal) with a small
+     padlock chip; tapping it opens the Pro panel instead of the mic. */
+  #mic { position: relative; }
+  #mic.locked { filter: grayscale(.5) brightness(.72); }
+  #mic.locked::after { content: "\1F512"; position: absolute; right: -2px;
+        bottom: 2px; font-size: 1.1rem; line-height: 1;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 999px; padding: .28rem .32rem; box-shadow: var(--shadow); }
+  .prolock { font-size: .8em; opacity: .85; }
+  #probox { width: 100%; border-top: 1px solid var(--border);
+            margin-top: .4rem; padding-top: .55rem; }
+  #prostatus { text-align: left; }
+  #prostatus b { color: var(--accent-text); }
+  #prostatus.warn b { color: var(--danger); }
+  #prorow { margin-top: .45rem; max-width: none; }
+  #prorow input { font-family: var(--font-label); font-size: .9rem; }
   #mic:focus-visible { outline: 3px solid var(--amber); outline-offset: 4px; }
   #mic.listening { background: radial-gradient(circle at 35% 30%,
                    #f0b254, var(--amber) 55%, #b87a24);
@@ -271,6 +287,17 @@
         opzione spenta e usare il microfono a tocco (un suono solo per comando). La parola chiave dà
         il meglio su PC/tablet con Chrome.</span></div>
       <label class="hint"><input type="checkbox" id="readback"> <span data-i18n="readback_lbl">🔊 leggi la risposta ad alta voce</span></label>
+      <div id="probox">
+        <div id="prostatus" class="hint"></div>
+        <div class="row" id="prorow">
+          <label for="prokey" class="sr-only" data-i18n="pro_key_lbl">Chiave di licenza Pro</label>
+          <input id="prokey" autocomplete="off" spellcheck="false"
+                 placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX">
+          <button class="send" id="proact" type="button" data-i18n="pro_activate">Attiva</button>
+        </div>
+        <a class="hint" id="probuy" target="_blank" rel="noopener" href="#"
+           data-i18n="pro_buy" style="display:inline-block; margin-top:.35rem">Acquista la licenza Pro ↗</a>
+      </div>
     </div>
     <details class="hint" id="voicepanel" style="display:none; margin-top:.5rem">
       <summary data-i18n="voices_summary">Voci &amp; lingue</summary>
@@ -468,6 +495,17 @@ const UI_EN = {
   lbl_text: "Text command",
   log_label: "Command history",
   np_label: "Now playing",
+  pro_activate: "Activate",
+  pro_key_lbl: "Pro license key",
+  pro_buy: "Buy the Pro license ↗",
+  pro_pitch: "Microphone, wake word, read-back voices and kid-safe are <b>Pro</b> " +
+    "features — a one-time license, yours forever. Typing commands is free, always.",
+  pro_active: (k) => "Pro active — license " + k + ". Thank you for supporting the project!",
+  pro_revoked: "This license was <b>disabled or refunded</b>: Pro features are off. " +
+    "Enter a valid key to re-activate.",
+  pro_err_network: "Couldn't reach the license server. Check the connection and try again.",
+  pro_err_invalid: "Key not valid (or activation limit reached): ",
+  pro_only: " — Pro feature",
 };
 // Italian counterparts of the dynamic strings (the labels come from the markup).
 const UI_IT = {
@@ -494,6 +532,17 @@ const UI_IT = {
   lbl_text: "Comando testuale",
   log_label: "Cronologia comandi",
   np_label: "In riproduzione",
+  pro_activate: "Attiva",
+  pro_key_lbl: "Chiave di licenza Pro",
+  pro_buy: "Acquista la licenza Pro ↗",
+  pro_pitch: "Microfono, parola chiave, voci di lettura e kid-safe sono funzioni " +
+    "<b>Pro</b> — licenza una tantum, tua per sempre. Scrivere i comandi è gratis, sempre.",
+  pro_active: (k) => "Pro attivo — licenza " + k + ". Grazie per sostenere il progetto!",
+  pro_revoked: "Questa licenza risulta <b>disattivata o rimborsata</b>: le funzioni Pro " +
+    "sono spente. Inserisci una chiave valida per riattivarle.",
+  pro_err_network: "Non raggiungo il server delle licenze. Controlla la connessione e riprova.",
+  pro_err_invalid: "Chiave non valida (o limite attivazioni raggiunto): ",
+  pro_only: " — funzione Pro",
 };
 const IT_MARKUP = {};  // Italian innerHTML of every [data-i18n], snapshotted at load
 document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -535,6 +584,7 @@ function applyUI() {
   if (ww) ww.textContent = ($("wakeword").value || "impianto").trim();
   buildSourceOptions();
   buildVoicePickers();  // re-localizes the "(no voice)" option
+  applyPro();           // re-localizes the Pro panel strings
   refreshStatus();
 }
 
@@ -661,6 +711,87 @@ $("readback").onchange = () => {
   syncVoicePanel();
 };
 syncVoicePanel();
+
+// --- Pro license state ---
+// The truth lives server-side (/license, cached activation file); the page
+// keeps a localStorage hint so an offline Pro household still gets its mic
+// button (server-enforced features re-check server-side anyway). Never baked
+// into the served HTML: the PWA-cached copy must not carry stale state.
+const PRO_STORE_URL = "https://vivavoce.lemonsqueezy.com";  // checkout link, set at launch
+let PRO = localStorage.getItem("pro_hint") === "1";
+let PRO_INFO = null;
+
+function applyPro() {
+  $("mic").classList.toggle("locked", !PRO);
+  $("wakemode").disabled = !PRO;
+  $("readback").disabled = !PRO;
+  if (!PRO) {
+    if ($("wakemode").checked) {
+      $("wakemode").checked = false;
+      $("wakehint").style.display = "none";
+    }
+    if ($("readback").checked) { $("readback").checked = false; syncVoicePanel(); }
+  }
+  const st = $("prostatus");
+  st.classList.remove("warn");
+  const showBuy = !PRO;
+  $("prorow").style.display = showBuy ? "" : "none";
+  $("probuy").style.display = showBuy ? "inline-block" : "none";
+  $("probuy").href = PRO_STORE_URL;
+  if (PRO) {
+    st.textContent = ui("pro_active")((PRO_INFO && PRO_INFO.key) || "****");
+  } else if (PRO_INFO && PRO_INFO.revoked) {
+    st.classList.add("warn");
+    st.innerHTML = ui("pro_revoked");
+  } else {
+    st.innerHTML = ui("pro_pitch");
+  }
+}
+
+function setPro(info) {
+  PRO = !!(info && info.pro);
+  PRO_INFO = info || null;
+  localStorage.setItem("pro_hint", PRO ? "1" : "0");
+  applyPro();
+}
+
+async function refreshLicense() {
+  try {
+    const r = await fetch("/license");
+    setPro(await r.json());
+  } catch (e) { applyPro(); }  // offline/static: keep the last hint
+}
+
+function showProUpsell() {
+  $("settings").open = true;
+  $("probox").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+$("proact").onclick = async () => {
+  const key = $("prokey").value.trim();
+  if (!key) return;
+  $("proact").disabled = true;
+  const st = $("prostatus");
+  try {
+    const r = await fetch("/license", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key })
+    });
+    const d = await r.json();
+    if (d.ok) { $("prokey").value = ""; setPro(d); }
+    else {
+      st.classList.add("warn");
+      st.textContent = d.error === "network"
+        ? ui("pro_err_network") : ui("pro_err_invalid") + (d.detail || "");
+    }
+  } catch (e) {
+    st.classList.add("warn");
+    st.textContent = ui("pro_err_network");
+  } finally {
+    $("proact").disabled = false;
+  }
+};
 
 // --- wake-word field (used by the recogniser below) ---
 const wakeWord = () => ($("wakeword").value || "impianto").trim();
@@ -915,6 +1046,8 @@ if (!SR) {
   }
 
   mic.onclick = () => {
+    // Il microfono è una funzione Pro: da bloccato porta al pannello licenza.
+    if (!PRO) { showProUpsell(); return; }
     if ($("wakemode").checked) { if (active) stopAll(); else startWake(); }
     else startManual();
   };
@@ -966,6 +1099,9 @@ if (!SR) {
 
 // Render the UI in the selected language (labels, source options, status line).
 applyUI();
+// Ask the server for the real license state (the localStorage hint bridges
+// the gap and offline opens).
+refreshLicense();
 
 // First-ever visit: open the settings panel so language and source get noticed.
 if (!localStorage.getItem("reclang") && !localStorage.getItem("source")) {

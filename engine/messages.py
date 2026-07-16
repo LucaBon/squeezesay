@@ -97,6 +97,8 @@ IT = {
         "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "
         "oppure quali album ho di.",
     "internal_error": "Errore interno: {error}",
+    "pro_required":
+        "Questa è una funzione Pro: si attiva dalle impostazioni della pagina.",
 }
 
 EN = {
@@ -184,6 +186,8 @@ EN = {
         "I didn't understand. Try: play, play the album, from my music, "
         "or which albums do I have by.",
     "internal_error": "Internal error: {error}",
+    "pro_required":
+        "This is a Pro feature: activate it from the page settings.",
 }
 
 CATALOGS = {"it": IT, "en": EN}

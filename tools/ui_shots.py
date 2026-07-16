@@ -89,6 +89,14 @@ def main():
             page.evaluate(FILL_NOWPLAYING)
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"04-nowplaying-{scheme}.png")
+            # Pro states: locked (free tier, settings open on the pitch) and
+            # active (mic unlocked, license line in settings).
+            page.evaluate("setPro({pro: false}); showProUpsell();")
+            page.wait_for_timeout(400)
+            page.screenshot(path=OUT / f"05-pro-locked-{scheme}.png")
+            page.evaluate("setPro({pro: true, key: '****ABCD'})")
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"06-pro-active-{scheme}.png")
             ctx.close()
         browser.close()
     print("done ->", OUT)
