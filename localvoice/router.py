@@ -1,8 +1,8 @@
 """Local intent router (Italian + English).
 
 Maps free text (from the browser's speech recognition, or a text box) to the
-SAME action functions used by the Alexa skill (``actions.py`` + ``lms.py``).
-No cloud, no Alexa — just rules over the transcribed text.
+action functions of the shared engine (``actions.py`` + ``lms.py``).
+No cloud — just rules over the transcribed text.
 
 Language: every pattern lives in ``PATTERNS[lang]`` (it/en); the client sends
 the language it is speaking (the page's mic-language selector) and the reply

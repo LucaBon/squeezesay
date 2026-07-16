@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Local voice web server — no cloud, no Alexa, no AWS.
+"""Local voice web server — no cloud, no accounts.
 
 Serves a page with a microphone button (browser speech recognition, it-IT) that
-posts the transcript to ``/command``; the same ``actions.py``/``lms.py`` engine
-used by the Alexa skill drives LMS/Daphile over the LAN. Runs entirely at home.
+posts the transcript to ``/command``; the ``actions.py``/``lms.py`` engine
+drives LMS/Daphile over the LAN. Runs entirely at home.
 
     python localvoice/server.py            # auto-discovers LMS on the LAN
     python localvoice/server.py --lms http://192.168.1.50:9000   # or point it
@@ -27,7 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(ROOT, "lambda"))  # actions, lms
+sys.path.insert(0, os.path.join(ROOT, "engine"))  # actions, lms
 sys.path.insert(0, HERE)  # router
 
 import discovery  # noqa: E402

@@ -20,7 +20,7 @@ ARG BUILD_VERSION
 RUN curl -sSL https://github.com/LucaBon/squeezesay/archive/refs/heads/main.tar.gz \
     | tar xz -C /tmp \
  && mkdir -p /app \
- && cp -r /tmp/squeezesay-main/lambda /tmp/squeezesay-main/localvoice \
+ && cp -r /tmp/squeezesay-main/engine /tmp/squeezesay-main/localvoice \
           /tmp/squeezesay-main/tools /tmp/squeezesay-main/deploy /app/ \
  && rm -rf /tmp/squeezesay-main
 

@@ -4,9 +4,8 @@
 #   docker build -t squeezesay .
 #   docker run --network host -v squeezesay-data:/data squeezesay
 #
-# L'immagine contiene solo la web app locale (localvoice/ + motore lambda/):
-# la skill Alexa si deploya a parte (vedi DEPLOY.md). Il certificato TLS viene
-# generato al primo avvio nel volume /data.
+# L'immagine contiene la web app locale (localvoice/ + motore engine/).
+# Il certificato TLS viene generato al primo avvio nel volume /data.
 FROM python:3.12-slim
 
 # Senza TTY lo stdout di Python resta nel buffer: senza questo, `docker logs`
@@ -17,7 +16,7 @@ ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir "cryptography>=42.0"
 
 WORKDIR /app
-COPY lambda/ lambda/
+COPY engine/ engine/
 COPY localvoice/ localvoice/
 COPY tools/make_cert.py tools/make_cert.py
 COPY deploy/docker/entrypoint.sh /entrypoint.sh

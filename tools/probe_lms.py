@@ -30,7 +30,7 @@ import socket
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "lambda"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "engine"))
 
 import actions  # noqa: E402
 from lms import SERVICES, LMSClient, LMSError, uri_kind  # noqa: E402

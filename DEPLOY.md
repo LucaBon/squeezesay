@@ -1,21 +1,13 @@
 # Deploy & setup
 
-Two ways to run the same engine (`lambda/actions.py` + `lambda/lms.py`):
-
-- **A) Local web app** — no cloud, no account, no cost. **Recommended.**
-- **B) Alexa skill** (Echo) — via **Alexa-hosted** (free, no AWS) or your own Lambda.
+The web app runs on your LAN and talks straight to LMS: no cloud account, no
+tunnel.
 
 Wherever you see `http://<IP-LMS>:9000` or a player MAC `aa:bb:cc:dd:ee:ff`, substitute
-your own. The local web app can usually **auto-discover** the LMS, so you may not need
+your own. The web app can usually **auto-discover** the LMS, so you may not need
 the address at all.
 
----
-
-## A) Local web app (recommended)
-
-Runs on your LAN and talks straight to LMS: no Amazon, no AWS, no tunnel, zero cost.
-
-### A0. Docker — one command, HTTPS included (Linux / NAS / Raspberry Pi)
+### Docker — one command, HTTPS included (Linux / NAS / Raspberry Pi)
 
 ```bash
 docker compose up -d
@@ -44,7 +36,7 @@ Everything is configured via environment variables in
 > [docker-compose.yml](docker-compose.yml): map the port, set `SQUEEZESAY_LMS`
 > explicitly, and put the host's LAN IP in `SQUEEZESAY_CERT_HOSTS`.
 
-### A0-bis. Home Assistant add-on
+### Home Assistant add-on
 
 If you run Home Assistant OS/Supervised, SqueezeSay installs as an add-on
 (same engine, wrapped for the Supervisor — see [ha-addon/](ha-addon/)):
@@ -58,7 +50,7 @@ If you run Home Assistant OS/Supervised, SqueezeSay installs as an add-on
    once. Full details in the add-on's Documentation tab
    ([ha-addon/DOCS.md](ha-addon/DOCS.md)).
 
-### A1. Without Docker
+### Without Docker
 
 ```bash
 uv sync
@@ -124,13 +116,11 @@ The **text box works everywhere**, even over HTTP.
 Install and log in the plugin(s) on LMS/Daphile first (**LMS Settings → Plugins**:
 *TIDAL* and/or *Qobuz*). Then:
 
-- **Web app**: by default the server **auto-detects** the installed plugins and the
-  page's "Sorgente musica" selector only shows what's really there. Override with
-  `--services tidal,qobuz` (skips detection) and pick which one "auto" mode falls
-  back to with `--default-service qobuz`. Spoken phrases «da tidal …» / «da qobuz …»
-  always win over the selector. (Docker needs nothing: detection is the default.)
-- **Alexa skill**: one service per skill, chosen with `MUSIC_SERVICE=tidal|qobuz`
-  (env var or `config.py`; default `tidal`).
+By default the server **auto-detects** the installed plugins and the
+page's "Sorgente musica" selector only shows what's really there. Override with
+`--services tidal,qobuz` (skips detection) and pick which one "auto" mode falls
+back to with `--default-service qobuz`. Spoken phrases «da tidal …» / «da qobuz …»
+always win over the selector. (Docker needs nothing: detection is the default.)
 
 > [!NOTE]
 > Qobuz support is verified against a live LMS 9.0.3 + plugin-Qobuz 3.7.0. If the
@@ -146,57 +136,10 @@ Install and log in the plugin(s) on LMS/Daphile first (**LMS Settings → Plugin
 
 ---
 
-## B) Alexa skill (Echo)
-
-The code runs **in Amazon's cloud**, so you need a **tunnel** from home to LMS (the only
-way for Alexa to reach your server).
-
-### B0. Tunnel to LMS (both sub-options)
-On an always-on home host (not Daphile itself), expose LMS over HTTPS. With
-**Cloudflare Tunnel** (free, no router ports opened):
-```bash
-cloudflared tunnel --url http://<IP-LMS>:9000
-```
-You get an `https://….trycloudflare.com` URL → that's your `LMS_BASE_URL`. **Protect it**
-(Cloudflare Access or Basic Auth); if you use Basic Auth, also set
-`LMS_USERNAME`/`LMS_PASSWORD`.
-
-### B1. Alexa-hosted (free, NO AWS account) — easiest for Echo
-1. https://developer.amazon.com/alexa/console/ask → **Create Skill** → **Custom** →
-   hosting **Alexa-hosted (Python)** → language **Italiano (IT)** or
-   **English (US)** — replies follow the skill locale automatically.
-2. **Build → JSON Editor**: paste `interaction-models/it-IT.json` (or
-   `interaction-models/en-US.json` for English) → **Build Model**.
-3. **Code** tab: replace the contents with our `lambda_function.py`, `actions.py`,
-   `lms.py`, `messages.py`, `blocklist_store.py`; put `ask-sdk-core` in
-   `requirements.txt`. Create a **`config.py`**
-   (see `lambda/config.example.py`) with `LMS_BASE_URL` (the tunnel URL) and
-   `LMS_PLAYER_ID` (optional: `MUSIC_SERVICE = "qobuz"` to stream from Qobuz
-   instead of TIDAL). **Save** → **Deploy**.
-4. **Test** tab: enable **Development** — the skill is now usable **only on your
-   account** (no publishing, no Italian-store problem).
-
-Try: «Alexa, apri impianto» → «metti l'album The Wall».
-
-### B2. Your own AWS Lambda (needs an AWS account; free tier ≈ €0)
-1. Build the zip: `python tools/build_lambda.py` → `skill.zip`.
-2. AWS Console → **Lambda → Create function** → Runtime **Python 3.12** → upload
-   `skill.zip` → **Handler** `lambda_function.handler`.
-3. **Configuration → Environment variables**: `LMS_BASE_URL`, `LMS_PLAYER_ID`,
-   (optional) `LMS_USERNAME`/`LMS_PASSWORD`, (optional) `MUSIC_SERVICE`
-   (`tidal`, default, or `qobuz`).
-4. **Add trigger → Alexa Skills Kit** (paste the Skill ID from step 5).
-5. Developer Console: create a **Custom** skill (hosting *Provision your own*), import the
-   it-IT model, put the Lambda **ARN** in **Endpoint** → **Build Model** → **Test**.
-
----
-
 ## Updating
-- Web app / logic: edit files in `lambda/` and restart the local server; or rebuild the
-  zip (`python tools/build_lambda.py`) and re-upload; or paste updated files into the
-  Alexa-hosted editor and **Deploy**.
-- Voice model: re-import `interaction-models/it-IT.json` and **Build Model**.
+Edit files in `engine/`/`localvoice/` and restart the local server (Docker:
+`docker compose pull && docker compose up -d`; HA: update the add-on).
 
 ## Audio quality
-In every case SqueezeSay sends **only commands**: audio flows LMS → Squeezelite (Daphile) →
+SqueezeSay sends **only commands**: audio flows LMS → Squeezelite (Daphile) →
 DAC as always, so hi-res quality is unchanged. Make sure LMS doesn't resample to the player.

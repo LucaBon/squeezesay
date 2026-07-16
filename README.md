@@ -28,11 +28,9 @@ Great visual apps for this ecosystem already exist — SqueezeSay deliberately d
   — browse, queue, artwork, multi-room.
 - 🗣️ **Speak** with **SqueezeSay** — the one thing those don't do well hands-free.
 
-Two front-ends share one tested engine (`lambda/actions.py` + `lambda/lms.py`):
-
-1. 🏠 **Local web app** (`localvoice/`) — **recommended.** No cloud, no account, no
-   cost. A browser mic/text page on your LAN that talks straight to LMS.
-2. 🔵 **Alexa skill** (`lambda/`) — a private, unpublished custom skill for your Echo.
+The app is a **local web app** (`localvoice/`) over a tested engine
+(`engine/actions.py` + `engine/lms.py`): a browser mic/text page on your LAN
+that talks straight to LMS. No cloud, no account.
 
 ## Why it doesn't play the wrong song
 
@@ -45,12 +43,11 @@ no LLM), so behaviour is testable and repeatable.
 | 🧠 **Title / artist / album parsing** | "metti Comfortably Numb **dei** Pink Floyd" → title + artist; "… **dall'album** X" → album. |
 | 🎯 **Artist-aware ranking** | Streaming results are read in *menu mode*, which carries the **artist** — so among three "Comfortably Numb" it plays *Pink Floyd's* edition and confirms it out loud. |
 | 🎼 **Two streaming services** | **TIDAL** and **Qobuz** (plus your local library): pick one in the page's source selector — it only lists the plugins your LMS actually has — or just say «da qobuz metti …». "Auto" tries your library first, then the default service. |
-| ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — on both front-ends. On the web app the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
+| ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
 | 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
 | 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
 | 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("impianto" by default): «impianto metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
 | 🌍 **Natural multilingual read-back** | Optional, off by default (the transcript is on screen). When on, the Italian frame is spoken by an Italian voice and the title/artist in *their* language (English/Spanish/French/German), with the best natural voices your browser offers — pickable in settings. |
-| 🧒 **Kid-safe filter (Alexa only)** | A voice-editable blocklist gated by Alexa Voice ID. |
 
 ## Quick start — local web app
 
@@ -68,6 +65,7 @@ docker compose up -d
 **As a Home Assistant add-on**: add this repo's URL under *Settings → Add-ons →
 Add-on store → ⋮ → Repositories*, then install **SqueezeSay** — see
 [DEPLOY.md](DEPLOY.md).
+
 
 **Without Docker** (Python ≥ 3.9 + [uv](https://docs.astral.sh/uv/)):
 
@@ -92,7 +90,7 @@ on the page (the whole UI follows):
 > by the helper scripts). Install the generated **local CA** once per phone (page
 > panel *"📱 Installa come app"*) for a green lock and a real **installable PWA**.
 > The **text box works everywhere**, even plain HTTP. Full setup — Docker, HTTPS,
-> autostart on Windows/Linux, and the Alexa skill — is in **[DEPLOY.md](DEPLOY.md)**.
+> autostart on Windows/Linux — is in **[DEPLOY.md](DEPLOY.md)**.
 
 There's a link to Material Skin right in the page for when you want to browse visually.
 
@@ -100,20 +98,18 @@ There's a link to Material Skin right in the page for when you want to browse vi
 
 | Path | What |
 |---|---|
-| `lambda/actions.py` | Voice-action business logic (matching, ranking, did-you-mean) |
-| `lambda/lms.py` | LMS JSON-RPC client + TIDAL search/playback |
-| `lambda/lambda_function.py` | Alexa skill handlers (ask-sdk) |
-| `lambda/discovery.py` | LMS LAN auto-discovery (UDP) |
-| `lambda/blocklist_store.py` | Kid-safe blocklist (DynamoDB) |
+| `engine/actions.py` | Voice-action business logic (matching, ranking, did-you-mean) |
+| `engine/lms.py` | LMS JSON-RPC client + TIDAL search/playback |
+| `engine/discovery.py` | LMS LAN auto-discovery (UDP) |
+| `engine/blocklist_store.py` | Kid-safe blocklist (store contract) |
 | `localvoice/` | Local web app: `server.py`, `router.py`, `index.html` |
-| `interaction-models/it-IT.json` | Alexa interaction model |
 | `tools/probe_lms.py` | Validate search/playback against a real LMS |
 | `tests/` | pytest suite (simulated LMS transport, no network) |
 
 ## Tests
 
 ```bash
-uv run pytest        # 353 tests, no network — uses a simulated LMS transport
+uv run pytest        # 355 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS (read-only, or `--play` to actually play):
@@ -125,13 +121,9 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
 
 ## Honest caveats
 
-- **The voice interface speaks Italian and English.** Web app: pick the mic
-  language on the page — commands are parsed and answered in that language, and
-  the page labels follow it too. Alexa: import `interaction-models/en-US.json`
-  for an English skill. Other languages fall back to Italian for now.
-- **The Alexa path needs an always-on home host + an HTTPS tunnel** (Cloudflare
-  Tunnel/ngrok): Alexa runs in the cloud and can't reach your LMS otherwise. The
-  **local web app needs none of that.**
+- **The voice interface speaks Italian and English.** Pick the mic language on
+  the page — commands are parsed and answered in that language, and the page
+  labels follow it too. Other languages fall back to Italian for now.
 - **Wake-word mode on Android beeps**: the browser plays its own earcon every time
   continuous listening restarts — a platform behaviour SqueezeSay can't silence
   (the app warns about it in-page).
@@ -148,3 +140,10 @@ uv run python tools/probe_lms.py --service qobuz --query "Pink Floyd"
   lossy Ogg Vorbis 320 kbps — pointless on a bit-perfect chain. If Spotify ever
   opens lossless to the Connect API, a plugin path may become worth adding.
 - Bit-perfect: SqueezeSay sends **only commands**; ensure LMS doesn't resample to the player.
+
+## License
+
+Open-core. The engine, the web server and the free features are **AGPL-3.0**
+([LICENSE](LICENSE)). The files under `localvoice/pro/` are proprietary,
+covered by the [Pro EULA](licenses/PRO-EULA.md) and unlocked by a one-time
+Pro license key. Details in [licenses/README.md](licenses/README.md).

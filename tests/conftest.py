@@ -1,6 +1,6 @@
 """Shared test fixtures.
 
-Adds the ``lambda/`` directory to ``sys.path`` so tests can import ``lms`` and
+Adds the ``engine/`` directory to ``sys.path`` so tests can import ``lms`` and
 ``actions`` directly, and provides a scriptable fake transport that mimics the
 LMS JSON-RPC server without any network access.
 """
@@ -11,9 +11,9 @@ import sys
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
-LAMBDA_DIR = os.path.join(ROOT, "lambda")
+ENGINE_DIR = os.path.join(ROOT, "engine")
 LOCALVOICE_DIR = os.path.join(ROOT, "localvoice")
-sys.path.insert(0, LAMBDA_DIR)
+sys.path.insert(0, ENGINE_DIR)
 sys.path.insert(0, LOCALVOICE_DIR)
 
 from lms import LMSClient, LMSError  # noqa: E402

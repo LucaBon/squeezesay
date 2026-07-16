@@ -97,20 +97,6 @@ IT = {
         "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "
         "oppure quali album ho di.",
     "internal_error": "Errore interno: {error}",
-
-    # -- Alexa skill -----------------------------------------------------------
-    "launch":
-        "Impianto pronto. Puoi dire, ad esempio: riproduci Comfortably Numb dei "
-        "Pink Floyd; metti l'album The Wall; metti la musica di Aerosmith; oppure "
-        "metti in pausa. Cosa ascoltiamo?",
-    "launch_no_personalization": " Personalizzazione non ancora configurata.",
-    "help":
-        "Posso riprodurre un brano, un album, un artista o una playlist, in streaming "
-        "o dalla tua musica. Prova: riproduci Time dei Pink Floyd; metti l'album The "
-        "Wall; quali album ho di Yes, poi metti la due. Posso anche mettere in pausa, "
-        "cambiare traccia e regolare il volume. Cosa vuoi ascoltare?",
-    "alexa_fallback": "Non ho capito. Prova a dire: riproduci, oppure metti la musica di.",
-    "alexa_error": "Si è verificato un problema con l'impianto. Riprova tra poco.",
 }
 
 EN = {
@@ -198,20 +184,6 @@ EN = {
         "I didn't understand. Try: play, play the album, from my music, "
         "or which albums do I have by.",
     "internal_error": "Internal error: {error}",
-
-    # -- Alexa skill -----------------------------------------------------------
-    "launch":
-        "System ready. You can say, for example: play Comfortably Numb by "
-        "Pink Floyd; play the album The Wall; play music by Aerosmith; or "
-        "pause. What shall we listen to?",
-    "launch_no_personalization": " Personalization not configured yet.",
-    "help":
-        "I can play a track, an album, an artist or a playlist, from streaming "
-        "or from your music. Try: play Time by Pink Floyd; play the album The "
-        "Wall; which albums do I have by Yes, then play number two. I can also "
-        "pause, change track and adjust the volume. What do you want to listen to?",
-    "alexa_fallback": "I didn't understand. Try saying: play, or play music by.",
-    "alexa_error": "Something went wrong with the system. Please try again shortly.",
 }
 
 CATALOGS = {"it": IT, "en": EN}
