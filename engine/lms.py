@@ -585,3 +585,7 @@ class LMSClient:
     def volume(self, delta: int) -> Dict[str, Any]:
         sign = "+" if delta >= 0 else "-"
         return self.command("mixer", "volume", f"{sign}{abs(int(delta))}")
+
+    def seek(self, seconds: float) -> Dict[str, Any]:
+        """Jump to an absolute position (seconds) in the current track."""
+        return self.command("time", str(max(0, int(seconds))))

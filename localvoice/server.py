@@ -244,19 +244,56 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 result.update(license_mgr.status())
             self._send(200, json.dumps(result))
 
-        def _send_nowplaying(self):
-            # Sempre 200: il pannello si nasconde su mode "unknown", niente
+        def _nowplaying_payload(self):
+            # Mai un 5xx: il pannello si nasconde su mode "unknown", niente
             # spam di errori in console quando l'LMS è giù.
             try:
                 info = lms.status_info()
             except Exception:
-                self._send(200, json.dumps({"mode": "unknown"}))
-                return
+                return {"mode": "unknown"}
             if info.get("artwork"):
                 # Cache-buster: cambia col brano, così il browser non mostra
                 # la copertina precedente. L'URL vero lo risolve /artwork.
                 token = abs(hash((info["artwork"], info.get("title")))) % 10**8
                 info["artwork"] = f"/artwork?v={token}"
+            return info
+
+        def _send_nowplaying(self):
+            self._send(200, json.dumps(self._nowplaying_payload(),
+                                       ensure_ascii=False))
+
+        def _player_action(self):
+            # Trasporto dal mini-player (pausa/riprendi/salta/seek): neutro
+            # rispetto ai contenuti, quindi niente gate kid-safe. Risponde
+            # sempre 200 con lo stato aggiornato, così la UI si allinea
+            # subito senza aspettare il prossimo poll.
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                payload = {}
+            action = payload.get("action") or ""
+            actions = {
+                "pause": lms.pause,
+                "resume": lms.resume,
+                "next": lms.next_track,
+                "prev": lms.previous_track,
+            }
+            try:
+                if action == "seek":
+                    lms.seek(float(payload.get("seconds") or 0))
+                elif action in actions:
+                    actions[action]()
+                else:
+                    self._send(200, json.dumps(
+                        {"ok": False, "error": "unknown_action"}))
+                    return
+            except Exception:
+                self._send(200, json.dumps({"ok": False, "mode": "unknown"}))
+                return
+            info = self._nowplaying_payload()
+            info["ok"] = True
             self._send(200, json.dumps(info, ensure_ascii=False))
 
         def _send_artwork(self):
@@ -288,6 +325,9 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 return
             if self.path == "/kidsafe":
                 self._kidsafe_action()
+                return
+            if self.path == "/player":
+                self._player_action()
                 return
             if self.path != "/command":
                 self._send(404, '{"speech":"non trovato"}')

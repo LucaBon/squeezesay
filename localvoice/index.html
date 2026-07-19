@@ -212,13 +212,15 @@
             min-height: 44px; display: inline-flex; align-items: center; }
   .choice:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
   .choice:active { transform: scale(.97); }
-  /* Now-playing strip: artwork with the same machined-bezel treatment as the
-     knob, track metadata, a state lamp (green = playing, amber = paused) and
-     a thin amber elapsed bar hugging the bottom edge. */
-  #np { display: flex; gap: .8rem; align-items: center; position: relative;
-        overflow: hidden; padding: .7rem 1rem .85rem; flex-shrink: 0; }
+  /* Now-playing mini-player: artwork with the same machined-bezel treatment
+     as the knob, track metadata, a state lamp (green = playing, amber =
+     paused), then a transport row — prev / play-pause / next and a draggable
+     amber seek bar framed by elapsed/total times. */
+  #np { display: flex; flex-direction: column; gap: .45rem;
+        padding: .7rem 1rem .5rem; flex-shrink: 0; }
   #np[hidden] { display: none; }
-  #npart { width: 72px; height: 72px; border-radius: .45rem; object-fit: cover;
+  .nptop { display: flex; gap: .8rem; align-items: center; min-width: 0; }
+  #npart { width: 92px; height: 92px; border-radius: .45rem; object-fit: cover;
            flex-shrink: 0; background: var(--brand-soft);
            box-shadow: 0 0 0 3px rgba(0,0,0,.35), 0 0 0 4px rgba(255,255,255,.08),
                        var(--shadow); }
@@ -230,10 +232,38 @@
   #nplamp { width: .6em; height: .6em; border-radius: 50%; flex-shrink: 0;
             background: var(--brand-strong); box-shadow: 0 0 8px var(--brand-strong); }
   #np.paused #nplamp { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
-  #npbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
-           background: rgba(127,127,127,.18); }
-  #npfill { height: 100%; width: 0; background: var(--amber);
-            box-shadow: 0 0 6px var(--amber); transition: width .6s linear; }
+  .npctl { display: flex; align-items: center; gap: .3rem; }
+  .npbtn { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+           border: 1px solid var(--border); background: var(--surface-raised);
+           color: var(--text); cursor: pointer; padding: 0;
+           display: inline-flex; align-items: center; justify-content: center;
+           transition: border-color .15s, transform .1s, box-shadow .15s;
+           -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .npbtn:hover { border-color: var(--brand); box-shadow: var(--glow-brand); }
+  .npbtn:active { transform: scale(.94); }
+  .npbtn svg { width: 20px; height: 20px; }
+  #np:not(.paused) .ico-play { display: none; }
+  #np.paused .ico-pause { display: none; }
+  .nptime { font-family: var(--font-label); font-size: .74rem;
+            color: var(--text-muted); font-variant-numeric: tabular-nums;
+            flex-shrink: 0; min-width: 2.9em; text-align: center; }
+  /* The whole 44px-tall strip is the touch target; the visible bar is thin.
+     touch-action none: dragging the knob must not scroll the page. */
+  #npseek { flex: 1; min-width: 40px; height: 44px; display: flex;
+            align-items: center; cursor: pointer; touch-action: none;
+            border-radius: var(--radius-s); }
+  #npseek.nodur { cursor: default; }
+  #npbar { position: relative; width: 100%; height: 4px; border-radius: 999px;
+           background: rgba(127,127,127,.25); }
+  #npfill { position: relative; height: 100%; width: 0; border-radius: inherit;
+            background: var(--amber); box-shadow: 0 0 6px var(--amber);
+            transition: width .6s linear; }
+  #npseek.drag #npfill { transition: none; }
+  #npfill::after { content: ""; position: absolute; right: -6px; top: 50%;
+                   width: 12px; height: 12px; margin-top: -6px;
+                   border-radius: 50%; background: var(--amber);
+                   box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 8px var(--amber); }
+  #npseek.nodur #npfill::after { display: none; }
   #empty { display: flex; flex-direction: column; gap: .5rem; align-items: center;
            width: 100%; max-width: 480px; }
   #empty .choices { justify-content: center; align-self: center; }
@@ -265,13 +295,24 @@
   </div>
   <div class="content">
   <div id="np" class="card" hidden>
-    <img id="npart" alt="" hidden>
-    <div class="npmeta">
-      <div id="nptitle"></div>
-      <div id="npsub" class="hint" style="text-align:left"></div>
+    <div class="nptop">
+      <img id="npart" alt="" hidden>
+      <div class="npmeta">
+        <div id="nptitle"></div>
+        <div id="npsub" class="hint" style="text-align:left"></div>
+      </div>
+      <span id="nplamp" aria-hidden="true"></span>
     </div>
-    <span id="nplamp" aria-hidden="true"></span>
-    <div id="npbar" aria-hidden="true"><div id="npfill"></div></div>
+    <div class="npctl">
+      <button id="npprev" type="button" class="npbtn"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="18.5 5.5 10 12 18.5 18.5"/><line x1="6.5" y1="5.5" x2="6.5" y2="18.5"/></svg></button>
+      <button id="nptoggle" type="button" class="npbtn"><svg class="ico-play" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="8 5 19 12 8 19"/></svg><svg class="ico-pause" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="6.6" y="4.6" width="3.4" height="14.8" rx="1.5"/><rect x="14" y="4.6" width="3.4" height="14.8" rx="1.5"/></svg></button>
+      <button id="npnext" type="button" class="npbtn"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5.5 5.5 14 12 5.5 18.5"/><line x1="17.5" y1="5.5" x2="17.5" y2="18.5"/></svg></button>
+      <span id="npel" class="nptime">0:00</span>
+      <div id="npseek" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+        <div id="npbar"><div id="npfill"></div></div>
+      </div>
+      <span id="npdur" class="nptime">–:––</span>
+    </div>
   </div>
   <div id="log" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Cronologia comandi"></div>
   <div id="empty">
@@ -398,6 +439,9 @@ function bubble(text, who) {
   d.className = "bubble " + who;
   d.textContent = text;
   log.prepend(d);
+  // The log is a receipt, not an archive: keep the DOM bounded in long
+  // sessions (~25 exchanges; choice rows age out with the rest).
+  while (log.children.length > 50) log.lastChild.remove();
   log.closest(".content").scrollTop = 0;  // newest bubble always in view
   return d;
 }
@@ -530,6 +574,10 @@ const UI_EN = {
   lbl_text: "Text command",
   log_label: "Command history",
   np_label: "Now playing",
+  np_prev: "Previous track",
+  np_toggle: "Play/pause",
+  np_next: "Next track",
+  np_seek: "Track position",
   pro_activate: "Activate",
   pro_key_lbl: "Pro license key",
   pro_buy: "Buy the Pro license ↗",
@@ -586,6 +634,10 @@ const UI_IT = {
   lbl_text: "Comando testuale",
   log_label: "Cronologia comandi",
   np_label: "In riproduzione",
+  np_prev: "Brano precedente",
+  np_toggle: "Riproduci/pausa",
+  np_next: "Brano successivo",
+  np_seek: "Posizione nel brano",
   pro_activate: "Attiva",
   pro_key_lbl: "Chiave di licenza Pro",
   pro_buy: "Acquista la licenza Pro ↗",
@@ -997,16 +1049,52 @@ const currentSource = () => $("source").value || "auto";
 // (or the LMS is unreachable — the endpoint answers mode "unknown", not 5xx).
 const NP_POLL_MS = 5000;
 let npLastArt = null;
+// Last poll snapshot + when it arrived: the 1 s ticker extrapolates elapsed
+// between polls so the time/bar move smoothly instead of jumping every 5 s.
+let npState = null;
+let npSeeking = false;  // finger on the bar: nothing may overwrite the UI
+
+function fmtTime(s) {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : String(m))
+       + ":" + String(sec).padStart(2, "0");
+}
+function npNow() {
+  if (!npState || npState.elapsed == null) return 0;
+  let e = npState.elapsed;
+  if (npState.mode === "play") e += (performance.now() - npState.syncedAt) / 1000;
+  return npState.duration ? Math.min(e, npState.duration) : e;
+}
+function renderNpTime() {
+  if (!npState || npSeeking) return;
+  const dur = npState.duration || 0, cur = npNow();
+  $("npel").textContent = fmtTime(cur);
+  $("npdur").textContent = dur ? fmtTime(dur) : "–:––";
+  $("npfill").style.width = (dur ? Math.min(100, 100 * cur / dur) : 0) + "%";
+  const seek = $("npseek");
+  seek.classList.toggle("nodur", !dur);
+  seek.setAttribute("aria-disabled", dur ? "false" : "true");
+  seek.setAttribute("aria-valuemax", String(Math.round(dur)));
+  seek.setAttribute("aria-valuenow", String(Math.round(cur)));
+  seek.setAttribute("aria-valuetext",
+    fmtTime(cur) + (dur ? " / " + fmtTime(dur) : ""));
+}
 function renderNowPlaying(d) {
   const el = $("np");
   if (!d || !d.title || (d.mode !== "play" && d.mode !== "pause")) {
     el.hidden = true;
     npLastArt = null;
+    npState = null;
     return;
   }
   el.hidden = false;
   el.classList.toggle("paused", d.mode === "pause");
   el.setAttribute("aria-label", ui("np_label"));
+  $("npprev").setAttribute("aria-label", ui("np_prev"));
+  $("nptoggle").setAttribute("aria-label", ui("np_toggle"));
+  $("npnext").setAttribute("aria-label", ui("np_next"));
+  $("npseek").setAttribute("aria-label", ui("np_seek"));
   $("nptitle").textContent = d.title;
   $("npsub").textContent = [d.artist, d.album].filter(Boolean).join(" · ");
   const img = $("npart");
@@ -1019,9 +1107,9 @@ function renderNowPlaying(d) {
     img.hidden = true;
     npLastArt = null;
   }
-  const pct = d.duration && d.elapsed != null
-    ? Math.min(100, 100 * d.elapsed / d.duration) : 0;
-  $("npfill").style.width = pct + "%";
+  npState = { mode: d.mode, elapsed: d.elapsed, duration: d.duration || 0,
+              syncedAt: performance.now() };
+  renderNpTime();
 }
 async function refreshNowPlaying() {
   try {
@@ -1030,10 +1118,92 @@ async function refreshNowPlaying() {
   } catch (e) { renderNowPlaying(null); }
 }
 setInterval(() => { if (!document.hidden) refreshNowPlaying(); }, NP_POLL_MS);
+setInterval(() => {
+  if (!document.hidden && npState && npState.mode === "play") renderNpTime();
+}, 1000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshNowPlaying();
 });
 refreshNowPlaying();
+
+// --- Mini-player transport: POST /player, render the returned status so the
+// card syncs immediately instead of waiting for the next poll.
+async function playerAction(action, seconds) {
+  const body = { action };
+  if (seconds != null) body.seconds = seconds;
+  try {
+    const r = await fetch("/player", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d && d.ok) renderNowPlaying(d);
+  } catch (e) { /* the next poll re-syncs */ }
+}
+$("npprev").onclick = () => playerAction("prev");
+$("npnext").onclick = () => playerAction("next");
+$("nptoggle").onclick = () => {
+  if (!npState) return;
+  const cur = npNow(), pausing = npState.mode === "play";
+  // Optimistic: freeze/restart the ticker and swap the icon right away.
+  npState.mode = pausing ? "pause" : "play";
+  npState.elapsed = cur;
+  npState.syncedAt = performance.now();
+  $("np").classList.toggle("paused", pausing);
+  playerAction(pausing ? "pause" : "resume");
+};
+
+// --- Seek bar: drag or tap anywhere on the strip; keyboard ±10 s. While the
+// pointer is down only the preview updates (npSeeking blocks poll/ticker),
+// the LMS "time" command fires once on release.
+const seekEl = $("npseek");
+function seekTime(ev) {
+  const r = seekEl.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+  return pct * npState.duration;
+}
+function seekPreview(t) {
+  $("npfill").style.width = (100 * t / npState.duration) + "%";
+  $("npel").textContent = fmtTime(t);
+}
+seekEl.addEventListener("pointerdown", (ev) => {
+  if (!npState || !npState.duration) return;
+  npSeeking = true;
+  seekEl.classList.add("drag");
+  seekEl.setPointerCapture(ev.pointerId);
+  seekPreview(seekTime(ev));
+  ev.preventDefault();
+});
+seekEl.addEventListener("pointermove", (ev) => {
+  if (npSeeking) seekPreview(seekTime(ev));
+});
+seekEl.addEventListener("pointerup", (ev) => {
+  if (!npSeeking) return;
+  npSeeking = false;
+  seekEl.classList.remove("drag");
+  const t = seekTime(ev);
+  npState.elapsed = t;
+  npState.syncedAt = performance.now();
+  renderNpTime();
+  playerAction("seek", Math.round(t));
+});
+seekEl.addEventListener("pointercancel", () => {
+  npSeeking = false;
+  seekEl.classList.remove("drag");
+  renderNpTime();
+});
+seekEl.addEventListener("keydown", (ev) => {
+  if (!npState || !npState.duration) return;
+  const step = ev.key === "ArrowRight" ? 10 : ev.key === "ArrowLeft" ? -10 : 0;
+  if (!step) return;
+  ev.preventDefault();
+  const t = Math.min(npState.duration, Math.max(0, npNow() + step));
+  npState.elapsed = t;
+  npState.syncedAt = performance.now();
+  renderNpTime();
+  playerAction("seek", Math.round(t));
+});
 
 let sending = false;
 async function send(text, alternatives) {

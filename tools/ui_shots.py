@@ -89,6 +89,10 @@ def main():
             page.evaluate(FILL_NOWPLAYING)
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"04-nowplaying-{scheme}.png")
+            page.evaluate(FILL_NOWPLAYING.replace('"play"', '"pause"'))
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"04b-nowplaying-paused-{scheme}.png")
+            page.evaluate(FILL_NOWPLAYING)
             # Pro states: locked (free tier, settings open on the pitch) and
             # active (mic unlocked, license line in settings).
             page.evaluate("setPro({pro: false}); showProUpsell();")

@@ -262,6 +262,8 @@ def test_play_browse_item(lms, transport):
         (lambda c: c.previous_track(), ["playlist", "index", "-1"]),
         (lambda c: c.volume(5), ["mixer", "volume", "+5"]),
         (lambda c: c.volume(-5), ["mixer", "volume", "-5"]),
+        (lambda c: c.seek(93.7), ["time", "93"]),
+        (lambda c: c.seek(-4), ["time", "0"]),  # clamped, never negative
     ],
 )
 def test_command_shapes(lms, transport, call, expected):

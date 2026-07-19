@@ -160,3 +160,72 @@ def test_artwork_404_when_nothing_plays(http_server, transport):
     with pytest.raises(urllib.error.HTTPError) as exc:
         _get(base + "/artwork")
     assert exc.value.code == 404
+
+
+# -- /player (mini-player transport) ------------------------------------------
+
+def _post(url, payload):
+    req = urllib.request.Request(
+        url, data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        return resp.status, json.loads(resp.read())
+
+
+PLAYING = {
+    "mode": "play", "time": 10,
+    "playlist_loop": [{"title": "Time", "artist": "Pink Floyd",
+                       "coverid": "ab12cd", "duration": 421}],
+}
+
+
+@pytest.mark.parametrize(
+    "payload, expected_cmd",
+    [
+        ({"action": "pause"}, ["pause", "1"]),
+        ({"action": "resume"}, ["pause", "0"]),
+        ({"action": "next"}, ["playlist", "index", "+1"]),
+        ({"action": "prev"}, ["playlist", "index", "-1"]),
+        ({"action": "seek", "seconds": 93.7}, ["time", "93"]),
+        ({"action": "seek", "seconds": -4}, ["time", "0"]),
+    ],
+)
+def test_player_actions_reach_the_lms(http_server, transport, payload,
+                                      expected_cmd):
+    base, _ = http_server
+    transport.responses["status"] = PLAYING
+    status, data = _post(base + "/player", payload)
+    assert status == 200
+    assert data["ok"] is True
+    assert expected_cmd in transport.commands()
+    # The reply carries the fresh status so the UI syncs without re-polling,
+    # artwork rewritten to the proxy like /nowplaying.
+    assert data["title"] == "Time"
+    assert data["artwork"].startswith("/artwork?v=")
+
+
+def test_player_unknown_action_is_refused(http_server, transport):
+    base, _ = http_server
+    transport.responses["status"] = PLAYING
+    status, data = _post(base + "/player", {"action": "explode"})
+    assert status == 200
+    assert data == {"ok": False, "error": "unknown_action"}
+    assert transport.commands() == []  # nothing reached the LMS
+
+
+def test_player_lms_down_answers_200_not_500(http_server, transport):
+    base, _ = http_server
+    transport.raise_on.add("pause")
+    status, data = _post(base + "/player", {"action": "pause"})
+    assert status == 200
+    assert data["ok"] is False
+
+
+def test_player_garbage_body_is_refused(http_server, transport):
+    base, _ = http_server
+    req = urllib.request.Request(
+        base + "/player", data=b"not json",
+        headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        data = json.loads(resp.read())
+    assert data["ok"] is False
