@@ -37,7 +37,9 @@ project itself renamed to Lyrion. What this means for existing installs:
   `uv sync --group asr` (or the Docker `--build-arg ASR=1` image) and flip
   «riconoscimento vocale locale» in settings; Web Speech remains the default
   and the automatic fallback. Model configurable with `--asr-model` /
-  `VIVAVOCE_ASR_MODEL` (default `small`), cached in the data directory. As a
+  `VIVAVOCE_ASR_MODEL`, cached in the data directory; the default is
+  RAM-aware — `small` on ~4 GB+ machines, off below that (the smaller models
+  mangle English song titles; an explicit `--asr-model` always wins). As a
   bonus, the mic now also works on browsers without Web Speech (Firefox).
 - **LMS status lamp** (free): the header LED turns red — with a clear message —
   when the music server is unreachable, instead of failing silently.

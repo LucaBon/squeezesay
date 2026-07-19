@@ -103,11 +103,19 @@ uv sync --group asr                      # the core stays dependency-free withou
 uv run python localvoice/server.py       # "Riconoscimento vocale locale attivo"
 ```
 
-- **Model**: `--asr-model` or `VIVAVOCE_ASR_MODEL` (default `small`; `tiny`
-  and `base` are faster and lighter, `medium` more accurate). Runs int8 on
-  CPU — no GPU needed. The model is downloaded once, on the first
-  transcription, into the data directory (`asr-models/`), so in Docker it
-  lands in the persistent volume.
+- **Model & RAM**: `--asr-model` or `VIVAVOCE_ASR_MODEL`. The default is
+  **RAM-aware**: on machines with ~4 GB or more, `small`; on smaller boxes
+  local recognition **stays off** unless you set a model explicitly. That's a
+  measured call, not caution: `tiny` and `base` transcribe pure-Italian
+  commands perfectly but mangle English song titles («Comfortably Numb» →
+  "fatta blina") — and titles are the whole point — while `small` peaks at
+  ~1 GB, which a 2 GB box running OS + LMS doesn't have. If you're on 2 GB
+  and mostly speak transport/volume commands, `--asr-model tiny` (~300 MB)
+  is a reasonable opt-in. Check your total RAM in Daphile's settings page —
+  remember the OS and LMS live in the same total. Runs int8 on CPU, no GPU
+  needed. The model is downloaded once, on the first transcription, into the
+  data directory (`asr-models/`), so in Docker it lands in the persistent
+  volume.
 - **Docker**: build the ASR variant with
   `docker build --build-arg ASR=1 -t vivavoce:asr .` (adds ~600 MB to the
   image), or add the build arg under `build:` in your compose file. The

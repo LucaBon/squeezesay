@@ -135,7 +135,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # 473 tests, no network — uses a simulated LMS transport
+uv run pytest        # 489 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS (read-only, or `--play` to actually play):

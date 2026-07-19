@@ -16,6 +16,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 import server as srv
+from pro.asr import MIN_RAM_GIB, default_model, total_ram_gib
 
 
 class FakeTranscriber:
@@ -184,3 +185,23 @@ def test_transcribe_silence_gives_ok_empty(serve):
     base = serve(transcriber=fake)
     _status, data = _post_audio(base + "/transcribe", b"AUDIO")
     assert data == {"ok": True, "text": "", "alternatives": []}
+
+
+# -- RAM-aware default model ---------------------------------------------------
+
+def test_default_model_is_ram_aware():
+    # Measured on the Italian fixtures: tiny/base mangle English song titles,
+    # and small (~1 GB peak) doesn't fit a 2 GB box next to OS + LMS — so
+    # below the threshold the default is OFF (an explicit --asr-model still
+    # wins, upstream of this function).
+    assert default_model(8.0) == "small"
+    assert default_model(3.8) == "small"   # a real-world "4 GB" machine
+    assert default_model(2.0) is None
+    assert default_model(MIN_RAM_GIB - 0.1) is None
+    # Unknown RAM (probe failed) must not cripple a capable machine.
+    assert default_model(0.0) == "small"
+
+
+def test_total_ram_probe_is_plausible():
+    gib = total_ram_gib()
+    assert 0.0 <= gib < 4096  # 0.0 = unknown is acceptable, garbage is not

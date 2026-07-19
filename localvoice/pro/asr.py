@@ -20,8 +20,60 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
 import threading
 from typing import Optional
+
+# Sotto questa RAM totale il riconoscimento locale resta SPENTO di default.
+# Misurato sui fixture italiani: tiny e base trascrivono bene i comandi in
+# puro italiano ma storpiano i titoli inglesi ("Comfortably Numb" →
+# "fatta blina"), e i titoli sono il cuore del prodotto; small è il primo
+# modello utilizzabile ma al picco vuole ~1 GB, che su una macchina da 2 GB
+# con sopra OS e LMS non ci sta. Un --asr-model esplicito forza comunque:
+# una casa che usa solo comandi di trasporto può scegliere tiny a ragion
+# veduta. (Soglia a 3.5 così una "4 GB" reale, che ne riporta ~3.8, passa.)
+MIN_RAM_GIB = 3.5
+
+
+def total_ram_gib() -> float:
+    """Total machine RAM in GiB — best-effort, stdlib only (0.0 = unknown)."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_uint32),
+                            ("dwMemoryLoad", ctypes.c_uint32),
+                            ("ullTotalPhys", ctypes.c_uint64),
+                            ("ullAvailPhys", ctypes.c_uint64),
+                            ("ullTotalPageFile", ctypes.c_uint64),
+                            ("ullAvailPageFile", ctypes.c_uint64),
+                            ("ullTotalVirtual", ctypes.c_uint64),
+                            ("ullAvailVirtual", ctypes.c_uint64),
+                            ("ullAvailExtendedVirtual", ctypes.c_uint64)]
+
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+                return stat.ullTotalPhys / (1024 ** 3)
+        else:
+            return (os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+                    / (1024 ** 3))
+    except (OSError, ValueError, AttributeError):
+        pass
+    return 0.0
+
+
+def default_model(total_gib: Optional[float] = None) -> Optional[str]:
+    """The Whisper model to use when none is configured; ``None`` = leave
+    local recognition off on this machine (see ``MIN_RAM_GIB``). Unknown RAM
+    (probe failed, 0.0) counts as capable: better a slow box that works than
+    a capable box crippled by a failed probe."""
+    if total_gib is None:
+        total_gib = total_ram_gib()
+    if total_gib and total_gib < MIN_RAM_GIB:
+        return None
+    return "small"
 
 
 class WhisperTranscriber:

@@ -505,28 +505,39 @@ def main() -> int:
                     help="servizio streaming usato in modalità automatica e "
                          "quando la frase non ne nomina uno (default: tidal)")
     ap.add_argument("--asr-model",
-                    default=appdata.env("ASR_MODEL", "small"),
+                    default=appdata.env("ASR_MODEL"),
                     help="modello Whisper per il riconoscimento vocale locale "
-                         "(tiny/base/small/medium...; default: small). Serve "
-                         "il gruppo opzionale: uv sync --group asr")
+                         "(tiny/base/small/medium...). Default: small, ma su "
+                         "macchine sotto ~4 GB di RAM resta spento se non "
+                         "indicato qui. Serve il gruppo: uv sync --group asr")
     args = ap.parse_args()
     data_dir = appdata.data_dir(args.data_dir)
     license_mgr = licensing.LicenseManager(data_dir)
     license_mgr.revalidate_async()  # settimanale, best-effort, mai bloccante
     from pro.kidsafe import KidSafe
     kidsafe = KidSafe(data_dir, license_mgr)
-    # Riconoscimento vocale locale (Pro): costruito sempre, il modello si
-    # carica solo al primo /transcribe. I modelli finiscono nella cartella
-    # dati (in Docker: il volume persistente), non nell'immagine.
-    from pro.asr import WhisperTranscriber
-    transcriber = WhisperTranscriber(
-        args.asr_model, cache_dir=os.path.join(data_dir, "asr-models"))
-    if transcriber.available():
-        print(f"Riconoscimento vocale locale attivo (faster-whisper, "
-              f"modello {args.asr_model}): l'audio del microfono resta in casa.")
-    else:
+    # Riconoscimento vocale locale (Pro): il modello si carica solo al primo
+    # /transcribe; i modelli finiscono nella cartella dati (in Docker: il
+    # volume persistente), non nell'immagine. Il default è RAM-aware: sotto
+    # ~4 GB resta spento (tiny/base storpiano i titoli inglesi, small non ci
+    # sta) a meno che --asr-model non lo forzi esplicitamente.
+    from pro.asr import (WhisperTranscriber, default_model, total_ram_gib)
+    asr_model = args.asr_model or default_model()
+    transcriber = None
+    if not WhisperTranscriber().available():
         print("Riconoscimento vocale locale non installato: il microfono usa "
               "il riconoscimento del browser. Per attivarlo: uv sync --group asr")
+    elif asr_model:
+        transcriber = WhisperTranscriber(
+            asr_model, cache_dir=os.path.join(data_dir, "asr-models"))
+        print(f"Riconoscimento vocale locale attivo (faster-whisper, modello "
+              f"{asr_model}): l'audio del microfono resta in casa.")
+    else:
+        print(f"Riconoscimento vocale locale spento: questa macchina ha "
+              f"~{total_ram_gib():.1f} GiB di RAM — il modello 'small' vuole "
+              "~1 GB al picco e quelli più piccoli storpiano i titoli "
+              "inglesi. Per forzarlo comunque: --asr-model tiny "
+              "(o VIVAVOCE_ASR_MODEL).")
 
     lms_url = args.lms
     if not lms_url:
