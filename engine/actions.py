@@ -425,47 +425,67 @@ def play_playlist(lms, name: Optional[str], *, guard: Optional[Guard] = None) ->
     return ActionResult(msg("playing_playlist", name=name), ok=True, terms=[name])
 
 
-def pause(lms) -> str:
+def pause(lms) -> ActionResult:
     try:
         lms.pause()
     except LMSError:
-        return msg("err_unreachable")
-    return msg("paused")
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("paused"), ok=True)
 
 
-def resume(lms) -> str:
+def resume(lms) -> ActionResult:
     try:
         lms.resume()
     except LMSError:
-        return msg("err_unreachable")
-    return msg("resumed")
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("resumed"), ok=True)
 
 
-def next_track(lms) -> str:
+def next_track(lms) -> ActionResult:
     try:
         lms.next_track()
     except LMSError:
-        return msg("err_unreachable")
-    return msg("next_track")
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("next_track"), ok=True)
 
 
-def previous_track(lms) -> str:
+def previous_track(lms) -> ActionResult:
     try:
         lms.previous_track()
     except LMSError:
-        return msg("err_unreachable")
-    return msg("previous_track")
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("previous_track"), ok=True)
 
 
-def change_volume(lms, direction: str) -> str:
+def change_volume(lms, direction: str) -> ActionResult:
     if direction not in ("up", "down"):
         raise ValueError(f"direction must be 'up' or 'down', got {direction!r}")
     delta = VOLUME_STEP if direction == "up" else -VOLUME_STEP
     try:
         lms.volume(delta)
     except LMSError:
-        return msg("err_unreachable")
-    return msg("volume_up") if direction == "up" else msg("volume_down")
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("volume_up" if direction == "up" else "volume_down"),
+                        ok=True)
+
+
+def set_sleep(lms, minutes: int) -> ActionResult:
+    """Arm the LMS sleep timer: playback stops after ``minutes``."""
+    if not minutes or minutes <= 0:
+        return ActionResult(msg("ask_sleep"), ok=False)
+    try:
+        lms.sleep(int(minutes) * 60)
+    except LMSError:
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("sleep_set", minutes=int(minutes)), ok=True)
+
+
+def cancel_sleep(lms) -> ActionResult:
+    try:
+        lms.sleep(0)
+    except LMSError:
+        return ActionResult(msg("err_unreachable"), ok=False)
+    return ActionResult(msg("sleep_cancelled"), ok=True)
 
 
 def now_playing(lms) -> str:

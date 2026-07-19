@@ -28,7 +28,26 @@ bubble("Non ho capito il comando.", "sys").classList.add("warn");
 FILL_NOWPLAYING = """
 renderNowPlaying({mode: "play", title: "Wish You Were Here",
                   artist: "Pink Floyd", album: "Wish You Were Here",
-                  duration: 334, elapsed: 128, artwork: "/icon-192.png"});
+                  duration: 334, elapsed: 128, volume: 40,
+                  artwork: "/icon-192.png"});
+"""
+
+# Populate the room selector as /players would (static server has no backend).
+# Rendering goes through renderPlayers() so the Pro lock state stays truthful
+# (locked in the free-tier shots, open in the Pro-active one).
+FILL_PLAYERS = """
+PLAYERS = [{id: "aa:bb", name: "Salotto"}, {id: "cc:dd", name: "Cucina"}];
+PLAYERS_CURRENT = "aa:bb";
+renderPlayers();
+"""
+
+# The static harness has no /nowplaying: the poll fails and the LMS lamp goes
+# red on its own (and would again mid-run at the next poll). Stub the setter so
+# every shot shows "on"; the dedicated shot calls the real one directly.
+CLEAR_LMSDOWN = """
+window._realSetLmsDown = setLmsDown;
+setLmsDown = () => {};
+window._realSetLmsDown(false);
 """
 
 
@@ -78,6 +97,9 @@ def main():
             page = ctx.new_page()
             page.goto(f"http://127.0.0.1:{PORT}/index.html")
             page.wait_for_timeout(400)
+            page.evaluate(CLEAR_LMSDOWN)
+            page.evaluate(FILL_PLAYERS)
+            page.wait_for_timeout(400)  # let the lamp's .3s color fade finish
             page.screenshot(path=OUT / f"01-empty-{scheme}.png")
             page.evaluate(FILL_LOG)
             page.wait_for_timeout(300)
@@ -108,6 +130,10 @@ def main():
                 " document.getElementById('kidsafebox').scrollIntoView();")
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"07-kidsafe-{scheme}.png")
+            # LMS unreachable: red header lamp + warning status line.
+            page.evaluate("window.scrollTo(0, 0); window._realSetLmsDown(true)")
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"09-lmsdown-{scheme}.png")
             ctx.close()
         browser.close()
     print("done ->", OUT)

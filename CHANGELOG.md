@@ -20,8 +20,18 @@ project itself renamed to Lyrion. What this means for existing installs:
 
 ### New
 
-- **Now-playing panel** (free): artwork, title/artist/album, play/pause lamp
-  and elapsed bar, at the top of the page.
+- **Now-playing panel** (free): artwork, title/artist/album, play/pause lamp,
+  transport buttons, a draggable seek bar and a **volume slider**, at the top
+  of the page.
+- **Multi-room** (Pro, `localvoice/pro/multiroom.py`): a "Dove suona la
+  musica" selector appears in settings when the LMS has more than one player,
+  and any command can target a room on the fly: «metti Time **in cucina**»,
+  «pausa in salotto» ("play … in the kitchen"). A follow-up «metti la 2»
+  keeps playing in that room. Enforced server-side, like kid-safe.
+- **Sleep timer** (free): «spegni tra 30 minuti», «stop in half an hour»,
+  «annulla il timer» — the LMS native sleep timer, armed by voice.
+- **LMS status lamp** (free): the header LED turns red — with a clear message —
+  when the music server is unreachable, instead of failing silently.
 - **Vivavoce Pro** — one-time license (11,90 €; launch price 8,90 €) that
   unlocks the microphone, the wake word, the multilingual read-back voices and
   kid-safe. Activation is once-online, then cached: offline never disables it.

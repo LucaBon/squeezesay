@@ -30,6 +30,7 @@
     --font-label: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: light) { :root {
+    color-scheme: light;  /* native widgets (range/select) follow the theme */
     --bg: #f4f7f5; --surface: #ffffff; --surface-raised: #ffffff;
     --border: #d7dfda; --text: #1b201d; --text-muted: #55605a;
     --brand: #1e7a3a; --brand-strong: #236237; --brand-soft: #e3f0e8;
@@ -69,11 +70,14 @@
              padding: .7rem max(1rem, env(safe-area-inset-right))
                       max(1.2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
   h1 { font-size: 1.15rem; font-weight: 600; margin: .2rem 0 0; letter-spacing: .02em; }
-  /* power-LED brand mark in place of the old emoji */
+  /* power-LED brand mark in place of the old emoji — doubles as the LMS
+     status lamp: amber = on, red = the music server is unreachable. */
   h1::before { content: ""; display: inline-block; width: .55em; height: .55em;
                border-radius: 50%; background: var(--amber);
                box-shadow: 0 0 8px var(--amber); margin-right: .5em;
-               vertical-align: middle; }
+               vertical-align: middle; transition: background .3s, box-shadow .3s; }
+  body.lmsdown h1::before { background: var(--danger);
+               box-shadow: 0 0 8px var(--danger); }
   :focus-visible { outline: 2px solid var(--brand-strong); outline-offset: 2px; }
   a, a.hint { color: var(--accent-text); }
   /* the hero: a lit knob — green when ready, amber VU pulse while listening */
@@ -264,6 +268,32 @@
                    border-radius: 50%; background: var(--amber);
                    box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 8px var(--amber); }
   #npseek.nodur #npfill::after { display: none; }
+  /* Volume row: a range input restyled to mirror the seek bar (4px track,
+     amber fill + glowing knob). --vol carries the fill percentage from JS
+     because Chromium can't paint the filled side of a range on its own.
+     44px tall strip for touch, the visible control stays slim. */
+  #npvolrow { display: flex; align-items: center; gap: .6rem; }
+  #npvolrow[hidden] { display: none; }
+  #npvolrow svg { width: 18px; height: 18px; color: var(--text-muted);
+                  flex-shrink: 0; }
+  #npvol { flex: 1; height: 44px; margin: 0; background: transparent;
+           border: none; padding: 0; cursor: pointer; touch-action: none;
+           -webkit-appearance: none; appearance: none; }
+  #npvol::-webkit-slider-runnable-track { height: 4px; border-radius: 999px;
+           background: linear-gradient(90deg,
+                       var(--amber) var(--vol, 50%),
+                       rgba(127,127,127,.25) var(--vol, 50%)); }
+  #npvol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px;
+           height: 12px; margin-top: -4px; border-radius: 50%;
+           background: var(--amber);
+           box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 8px var(--amber); }
+  #npvol::-moz-range-track { height: 4px; border-radius: 999px;
+           background: rgba(127,127,127,.25); }
+  #npvol::-moz-range-progress { height: 4px; border-radius: 999px;
+           background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  #npvol::-moz-range-thumb { width: 12px; height: 12px; border: none;
+           border-radius: 50%; background: var(--amber);
+           box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 8px var(--amber); }
   #empty { display: flex; flex-direction: column; gap: .5rem; align-items: center;
            width: 100%; max-width: 480px; }
   #empty .choices { justify-content: center; align-self: center; }
@@ -313,6 +343,10 @@
       </div>
       <span id="npdur" class="nptime">–:––</span>
     </div>
+    <div id="npvolrow" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6.5 8.5H3v7h3.5L11 19z"/><path d="M15 9.5a4 4 0 0 1 0 5"/><path d="M17.5 7a7.5 7.5 0 0 1 0 10"/></svg>
+      <input id="npvol" type="range" min="0" max="100" step="1" value="50">
+    </div>
   </div>
   <div id="log" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Cronologia comandi"></div>
   <div id="empty">
@@ -334,6 +368,8 @@
         <select id="reclang"></select></label>
       <label class="vrow hint" style="width:100%"><span data-i18n="lbl_source">Sorgente musica</span>
         <select id="source"></select></label>
+      <label class="vrow hint" id="playerrow" style="width:100%; display:none"><span><span data-i18n="lbl_player">Dove suona la musica</span> <span class="prolock" id="playerlock" hidden>🔒</span></span>
+        <select id="player"></select></label>
       <label class="hint"><input type="checkbox" id="wakemode"> <span data-i18n="wakemode_lbl">attiva a voce con una parola chiave</span>
         <input id="wakeword" type="text" value="vivavoce" autocomplete="off"></label>
       <div id="wakehint" class="hint" style="display:none; text-align:left" data-i18n="wakehint">Ascolto continuo: il microfono
@@ -392,6 +428,7 @@
       <li>«quali album ho di Yes» → «metti la 2» (o «metti Fragile»)</li>
       <li>«dalla mia musica metti …» · «da tidal metti …» · «da qobuz metti …»</li>
       <li>«pausa» · «riprendi» · «prossima» · «alza il volume» · «cosa sta suonando»</li>
+      <li>«spegni tra 30 minuti» · «annulla il timer» · «metti … in cucina»</li>
     </ul>
     <div data-i18n="tip_names">Suggerimento: se un <b>nome inglese</b> viene capito male (es. «Audioslave» →
       «audio slave»), correggilo nella casella e premi Invia.</div>
@@ -511,6 +548,7 @@ const UI_EN = {
   autosend: "send right after the mic (hands-free)",
   lbl_reclang: "Language I speak to the mic",
   lbl_source: "Music source",
+  lbl_player: "Where the music plays",
   wakemode_lbl: "voice-activate with a keyword",
   wakehint: 'Continuous listening: the microphone stays on and the audio goes through ' +
     'the browser’s speech recognition. Tap the mic once, then say ' +
@@ -530,7 +568,8 @@ const UI_EN = {
     "<li>“play the album The Wall” · “play music by Aerosmith”</li>" +
     "<li>“which albums do I have by Yes” → “play number 2” (or “play Fragile”)</li>" +
     "<li>“from my music play …” · “on tidal play …” · “on qobuz play …”</li>" +
-    "<li>“pause” · “resume” · “next” · “volume up” · “what's playing”</li>",
+    "<li>“pause” · “resume” · “next” · “volume up” · “what's playing”</li>" +
+    "<li>“stop in 30 minutes” · “cancel the timer” · “play … in the kitchen”</li>",
   tip_names: "Tip: if a name is <b>misheard</b>, fix it in the box and press Send.",
   install_summary: "Install as an app (no certificate warnings)",
   install_steps: '<li>Download the local CA: <a id="calink" href="/ca.pem">ca.pem</a> (once per device).</li>' +
@@ -561,6 +600,7 @@ const UI_EN = {
   src_auto: "Automatic: library, then streaming",
   src_local: "My library only",
   src_only: "Only ",
+  lms_down: "Can't reach the music server (LMS): check that it's on.",
   net_error: "Network error talking to the local server.",
   no_mic: "This browser doesn't support the microphone. Use the text box, or open in Chrome/Edge.",
   need_https: "The microphone needs HTTPS when opened from another device. Start the server " +
@@ -578,11 +618,13 @@ const UI_EN = {
   np_toggle: "Play/pause",
   np_next: "Next track",
   np_seek: "Track position",
+  np_vol: "Volume",
   pro_activate: "Activate",
   pro_key_lbl: "Pro license key",
   pro_buy: "Buy the Pro license ↗",
-  pro_pitch: "Microphone, wake word, read-back voices and kid-safe are <b>Pro</b> " +
-    "features — a one-time license, yours forever. Typing commands is free, always.",
+  pro_pitch: "Microphone, wake word, read-back voices, multi-room and kid-safe " +
+    "are <b>Pro</b> features — a one-time license, yours forever. " +
+    "Typing commands is free, always.",
   pro_active: (k) => "Pro active — license " + k + ". Thank you for supporting the project!",
   pro_revoked: "This license was <b>disabled or refunded</b>: Pro features are off. " +
     "Enter a valid key to re-activate.",
@@ -621,6 +663,7 @@ const UI_IT = {
   src_auto: "Automatica: libreria, poi streaming",
   src_local: "Solo la mia libreria",
   src_only: "Solo ",
+  lms_down: "Non raggiungo il server musicale (LMS): controlla che sia acceso.",
   net_error: "Errore di rete verso il server locale.",
   no_mic: "Questo browser non supporta il microfono. Usa la casella di testo, oppure apri con Chrome/Edge.",
   need_https: "Il microfono richiede HTTPS quando apri da un altro dispositivo. Avvia il " +
@@ -638,11 +681,13 @@ const UI_IT = {
   np_toggle: "Riproduci/pausa",
   np_next: "Brano successivo",
   np_seek: "Posizione nel brano",
+  np_vol: "Volume",
   pro_activate: "Attiva",
   pro_key_lbl: "Chiave di licenza Pro",
   pro_buy: "Acquista la licenza Pro ↗",
-  pro_pitch: "Microfono, parola chiave, voci di lettura e kid-safe sono funzioni " +
-    "<b>Pro</b> — licenza una tantum, tua per sempre. Scrivere i comandi è gratis, sempre.",
+  pro_pitch: "Microfono, parola chiave, voci di lettura, multi-stanza e kid-safe " +
+    "sono funzioni <b>Pro</b> — licenza una tantum, tua per sempre. " +
+    "Scrivere i comandi è gratis, sempre.",
   pro_active: (k) => "Pro attivo — licenza " + k + ". Grazie per sostenere il progetto!",
   pro_revoked: "Questa licenza risulta <b>disattivata o rimborsata</b>: le funzioni Pro " +
     "sono spente. Inserisci una chiave valida per riattivarle.",
@@ -677,14 +722,24 @@ const ui = (key) => (uiLang() === "it" ? UI_IT : UI_EN)[key];
 
 // The base state of the status line, re-rendered on language change. The mic
 // handlers overwrite it with transient text; that's fine until the next render.
-let statusBase = "default";  // "default" | "nomic" | "nohttps"
+let statusBase = "default";  // "default" | "nomic" | "nohttps" | "lmsdown"
 function refreshStatus() {
   if (statusBase === "nomic" || statusBase === "nohttps") {
     statusEl.innerHTML = '<span class="warn">' +
       ui(statusBase === "nomic" ? "no_mic" : "need_https") + "</span>";
+  } else if (statusBase === "lmsdown") {
+    statusEl.innerHTML = '<span class="warn">' + ui("lms_down") + "</span>";
   } else {
     statusEl.textContent = ui("status_tap_write");
   }
+}
+
+// LMS reachability lamp: the header LED turns red and the status line warns.
+// Only the "default" status is replaced — mic problems keep their message.
+function setLmsDown(down) {
+  document.body.classList.toggle("lmsdown", down);
+  if (down && statusBase === "default") { statusBase = "lmsdown"; refreshStatus(); }
+  else if (!down && statusBase === "lmsdown") { statusBase = "default"; refreshStatus(); }
 }
 
 function applyUI() {
@@ -871,6 +926,7 @@ function applyPro() {
   } else {
     st.innerHTML = ui("pro_pitch");
   }
+  renderPlayers();  // the room selector locks/unlocks with the license
 }
 
 function setPro(info) {
@@ -1045,6 +1101,49 @@ function buildSourceOptions() {
 buildSourceOptions();
 const currentSource = () => $("source").value || "auto";
 
+// --- Player (room) selector — a Pro feature, like its voice form
+// («metti … in cucina», both enforced server-side). Filled from /players;
+// hidden while the house has a single player; locked (padlock + upsell) on
+// the free tier. The choice is per-device (localStorage) and rides along on
+// /command, /player, /nowplaying — only when Pro, so a stale value is inert.
+const currentPlayer = () => (PRO ? localStorage.getItem("player") || "" : "");
+let PLAYERS = [], PLAYERS_CURRENT = "";
+function renderPlayers() {
+  const row = $("playerrow"), sel = $("player");
+  if (PLAYERS.length <= 1) { row.style.display = "none"; return; }
+  row.style.display = "";
+  sel.innerHTML = "";
+  PLAYERS.forEach(p => {
+    const o = document.createElement("option");
+    o.value = p.id;
+    o.textContent = p.name;
+    sel.appendChild(o);
+  });
+  const cur = currentPlayer();
+  sel.value = (cur && PLAYERS.some(p => p.id === cur)) ? cur
+            : (PLAYERS_CURRENT || PLAYERS[0].id);
+  sel.disabled = !PRO;
+  $("playerlock").hidden = PRO;
+}
+$("playerrow").addEventListener("click", (e) => {
+  if (!PRO && PLAYERS.length > 1) { e.preventDefault(); showProUpsell(); }
+});
+$("player").onchange = () => {
+  localStorage.setItem("player", $("player").value);
+  refreshNowPlaying();  // the mini-player follows the room immediately
+};
+async function loadPlayers() {
+  try {
+    const r = await fetch("/players");
+    const d = await r.json();
+    if (!d.ok || !Array.isArray(d.players)) return;
+    PLAYERS = d.players;
+    PLAYERS_CURRENT = d.current || "";
+    renderPlayers();
+  } catch (e) { /* static/offline: the row stays hidden */ }
+}
+loadPlayers();
+
 // --- Now-playing panel: polls /nowplaying, hides itself when nothing plays
 // (or the LMS is unreachable — the endpoint answers mode "unknown", not 5xx).
 const NP_POLL_MS = 5000;
@@ -1053,6 +1152,7 @@ let npLastArt = null;
 // between polls so the time/bar move smoothly instead of jumping every 5 s.
 let npState = null;
 let npSeeking = false;  // finger on the bar: nothing may overwrite the UI
+let npVolDrag = false;  // finger on the volume slider: polls keep hands off
 
 function fmtTime(s) {
   s = Math.max(0, Math.round(s));
@@ -1095,6 +1195,14 @@ function renderNowPlaying(d) {
   $("nptoggle").setAttribute("aria-label", ui("np_toggle"));
   $("npnext").setAttribute("aria-label", ui("np_next"));
   $("npseek").setAttribute("aria-label", ui("np_seek"));
+  $("npvol").setAttribute("aria-label", ui("np_vol"));
+  const volrow = $("npvolrow");
+  if (d.volume == null) {
+    volrow.hidden = true;
+  } else {
+    volrow.hidden = false;
+    if (!npVolDrag) setVolUI(d.volume);
+  }
   $("nptitle").textContent = d.title;
   $("npsub").textContent = [d.artist, d.album].filter(Boolean).join(" · ");
   const img = $("npart");
@@ -1113,9 +1221,13 @@ function renderNowPlaying(d) {
 }
 async function refreshNowPlaying() {
   try {
-    const r = await fetch("/nowplaying");
-    renderNowPlaying(await r.json());
-  } catch (e) { renderNowPlaying(null); }
+    const p = currentPlayer();
+    const r = await fetch("/nowplaying"
+                          + (p ? "?player=" + encodeURIComponent(p) : ""));
+    const d = await r.json();
+    setLmsDown(d.mode === "unknown");
+    renderNowPlaying(d);
+  } catch (e) { setLmsDown(true); renderNowPlaying(null); }
 }
 setInterval(() => { if (!document.hidden) refreshNowPlaying(); }, NP_POLL_MS);
 setInterval(() => {
@@ -1128,9 +1240,10 @@ refreshNowPlaying();
 
 // --- Mini-player transport: POST /player, render the returned status so the
 // card syncs immediately instead of waiting for the next poll.
-async function playerAction(action, seconds) {
-  const body = { action };
+async function playerAction(action, seconds, value) {
+  const body = { action, player: currentPlayer() };
   if (seconds != null) body.seconds = seconds;
+  if (value != null) body.value = value;
   try {
     const r = await fetch("/player", {
       method: "POST",
@@ -1205,6 +1318,24 @@ seekEl.addEventListener("keydown", (ev) => {
   playerAction("seek", Math.round(t));
 });
 
+// --- Volume slider: the drag previews locally (npVolDrag keeps the poll's
+// hands off); the LMS command fires once on release, not per pixel. --vol
+// paints the amber filled side of the track (CSS can't, on a range input).
+const npvolEl = $("npvol");
+function setVolUI(value) {
+  npvolEl.value = value;
+  npvolEl.style.setProperty("--vol", value + "%");
+}
+npvolEl.addEventListener("input", () => {
+  npVolDrag = true;
+  npvolEl.style.setProperty("--vol", npvolEl.value + "%");
+});
+npvolEl.addEventListener("change", () => {
+  npVolDrag = false;
+  playerAction("volume", null, Number(npvolEl.value));
+});
+npvolEl.addEventListener("pointercancel", () => { npVolDrag = false; });
+
 let sending = false;
 async function send(text, alternatives) {
   text = (text || "").trim();
@@ -1218,7 +1349,8 @@ async function send(text, alternatives) {
   $("send").disabled = true;
   // lang: the mic-language selector — the server parses the command and
   // replies in that language (it/en; others fall back to Italian).
-  const body = { text, client: clientId(), source: currentSource(), lang: recLang() };
+  const body = { text, client: clientId(), source: currentSource(),
+                 lang: recLang(), player: currentPlayer() };
   if (alternatives && alternatives.length > 1) body.alternatives = alternatives;
   try {
     const r = await fetch("/command", {

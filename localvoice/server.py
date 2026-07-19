@@ -120,22 +120,35 @@ def _http_fetch(url: str, timeout: float = 5.0):
 
 def make_handler(lms, material_url: str, services, default_service: str,
                  ca_path=None, artwork_fetch=_http_fetch, license_mgr=None,
-                 kidsafe=None):
-    # One Router (and thus its "metti la N" list state) per browser/client id, so
-    # two phones don't clobber each other's numbered list. Clients send a stable
+                 kidsafe=None, multiroom=None):
+    # One Router (and thus its "metti la N" list state) per browser/client id
+    # AND per selected player, so two phones — or one phone switched between
+    # rooms — don't clobber each other's numbered list. Clients send a stable
     # id; without one they share a single default router.
     routers = {}
     lock = threading.Lock()
     services = list(services)
 
-    def router_for(client_id: str) -> Router:
+    def multiroom_ok() -> bool:
+        """Multi-room (player selector + «in cucina» targeting) is Pro; the
+        feature object lives in pro/multiroom.py, like kid-safe."""
+        return multiroom is not None and multiroom.pro_ok()
+
+    def client_for(player_id: str):
+        """The LMS client for an optional per-request player override (the
+        UI player selector, Pro); the startup default player otherwise."""
+        return lms.for_player(player_id) if player_id and multiroom_ok() else lms
+
+    def router_for(client_id: str, player_id: str = "") -> Router:
+        key = (client_id, player_id if (player_id and multiroom_ok()) else "")
         with lock:
-            r = routers.get(client_id)
+            r = routers.get(key)
             if r is None:
-                r = Router(lms, default_service=default_service,
+                r = Router(client_for(key[1]), default_service=default_service,
                            services=tuple(services),
-                           kidsafe=kidsafe, client_id=client_id)
-                routers[client_id] = r
+                           kidsafe=kidsafe, client_id=client_id,
+                           multiroom=multiroom)
+                routers[key] = r
             return r
 
     class Handler(BaseHTTPRequestHandler):
@@ -164,6 +177,8 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 self._send_nowplaying()
             elif self.path.startswith("/artwork"):
                 self._send_artwork()
+            elif self.path.startswith("/players"):
+                self._send_players()
             elif self.path == "/license":
                 status = license_mgr.status() if license_mgr else {"pro": False}
                 self._send(200, json.dumps(status))
@@ -244,23 +259,52 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 result.update(license_mgr.status())
             self._send(200, json.dumps(result))
 
-        def _nowplaying_payload(self):
+        def _query_player(self) -> str:
+            """The optional ``player`` query param (the UI player selector)."""
+            from urllib.parse import parse_qs, urlparse
+            query = parse_qs(urlparse(self.path).query)
+            return (query.get("player") or [""])[0]
+
+        def _send_players(self):
+            # La lista player per il selettore stanza della UI. Mai un 5xx:
+            # con l'LMS giù (o senza il modulo multiroom) risponde ok:false e
+            # il selettore resta com'è.
+            if multiroom is None:
+                self._send(200, json.dumps({"ok": False, "players": []}))
+                return
+            try:
+                players = multiroom.players()
+            except Exception:
+                self._send(200, json.dumps({"ok": False, "players": []}))
+                return
+            out = [{"id": p["playerid"], "name": p.get("name") or p["playerid"]}
+                   for p in players if p.get("playerid")]
+            self._send(200, json.dumps(
+                {"ok": True, "pro": multiroom.pro_ok(), "current": lms.player_id,
+                 "players": out},
+                ensure_ascii=False))
+
+        def _nowplaying_payload(self, client=None):
             # Mai un 5xx: il pannello si nasconde su mode "unknown", niente
             # spam di errori in console quando l'LMS è giù.
+            client = client or lms
             try:
-                info = lms.status_info()
+                info = client.status_info()
             except Exception:
                 return {"mode": "unknown"}
             if info.get("artwork"):
                 # Cache-buster: cambia col brano, così il browser non mostra
                 # la copertina precedente. L'URL vero lo risolve /artwork.
+                from urllib.parse import quote
                 token = abs(hash((info["artwork"], info.get("title")))) % 10**8
-                info["artwork"] = f"/artwork?v={token}"
+                player_q = ("" if client.player_id == lms.player_id
+                            else "&player=" + quote(client.player_id))
+                info["artwork"] = f"/artwork?v={token}{player_q}"
             return info
 
         def _send_nowplaying(self):
-            self._send(200, json.dumps(self._nowplaying_payload(),
-                                       ensure_ascii=False))
+            payload = self._nowplaying_payload(client_for(self._query_player()))
+            self._send(200, json.dumps(payload, ensure_ascii=False))
 
         def _player_action(self):
             # Trasporto dal mini-player (pausa/riprendi/salta/seek): neutro
@@ -274,15 +318,18 @@ def make_handler(lms, material_url: str, services, default_service: str,
             except (ValueError, UnicodeDecodeError):
                 payload = {}
             action = payload.get("action") or ""
+            client = client_for(payload.get("player") or "")
             actions = {
-                "pause": lms.pause,
-                "resume": lms.resume,
-                "next": lms.next_track,
-                "prev": lms.previous_track,
+                "pause": client.pause,
+                "resume": client.resume,
+                "next": client.next_track,
+                "prev": client.previous_track,
             }
             try:
                 if action == "seek":
-                    lms.seek(float(payload.get("seconds") or 0))
+                    client.seek(float(payload.get("seconds") or 0))
+                elif action == "volume":
+                    client.volume_set(int(float(payload.get("value") or 0)))
                 elif action in actions:
                     actions[action]()
                 else:
@@ -292,7 +339,7 @@ def make_handler(lms, material_url: str, services, default_service: str,
             except Exception:
                 self._send(200, json.dumps({"ok": False, "mode": "unknown"}))
                 return
-            info = self._nowplaying_payload()
+            info = self._nowplaying_payload(client)
             info["ok"] = True
             self._send(200, json.dumps(info, ensure_ascii=False))
 
@@ -302,7 +349,7 @@ def make_handler(lms, material_url: str, services, default_service: str,
             # parametro dal client: l'URL viene sempre ricavato qui dallo
             # status del player, quindi niente open relay.
             try:
-                art = lms.status_info().get("artwork")
+                art = client_for(self._query_player()).status_info().get("artwork")
                 if not art:
                     self._send(404, "no artwork", "text/plain")
                     return
@@ -334,11 +381,13 @@ def make_handler(lms, material_url: str, services, default_service: str,
                 return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b"{}"
-            client_id, text = "default", ""
+            client_id, text, player_id = "default", "", ""
             try:
                 payload = json.loads(raw.decode("utf-8"))
                 text = payload.get("text", "")
                 client_id = payload.get("client") or "default"
+                # The UI player selector: commands go to that player's router.
+                player_id = payload.get("player") or ""
                 # Auto source (default): the router tries the local library first,
                 # then TIDAL. Explicit phrases ("dalla mia musica", "da tidal") and
                 # an explicit source still override.
@@ -352,7 +401,8 @@ def make_handler(lms, material_url: str, services, default_service: str,
             except (ValueError, UnicodeDecodeError):
                 source, alternatives, lang = "auto", [], "it"
             try:
-                result = router_for(client_id).handle_many(alternatives, source, lang)
+                result = router_for(client_id, player_id).handle_many(
+                    alternatives, source, lang)
             except Exception as exc:  # never 500 the client
                 result = {"speech": msg("internal_error", error=exc), "used": text,
                           "ok": False, "error": str(exc), "terms": []}
@@ -428,6 +478,10 @@ def main() -> int:
         print(f"Player: {players[0].get('name')} ({player})")
 
     client = LMSClient(lms_url, player)
+    # Multi-stanza (Pro): come il kid-safe, il modulo vive in pro/ e il core
+    # riceve solo l'oggetto col suo piccolo contratto.
+    from pro.multiroom import MultiRoom
+    multiroom = MultiRoom(license_mgr, client.get_players)
 
     # Which streaming services the source selector offers. "auto" asks the LMS
     # which plugins are installed; an explicit list skips the detection (the
@@ -467,7 +521,7 @@ def main() -> int:
         (args.host, args.port),
         make_handler(client, material_url, services, default_service,
                      ca_path=ca_path, license_mgr=license_mgr,
-                     kidsafe=kidsafe),
+                     kidsafe=kidsafe, multiroom=multiroom),
     )
 
     scheme = "http"

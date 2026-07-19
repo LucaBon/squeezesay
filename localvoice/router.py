@@ -60,6 +60,36 @@ def _as_number(token, ordinals=False):
     return number
 
 
+# Durations go beyond list positions: the sleep timer needs the spoken tens too
+# («spegni tra trenta minuti» / "stop in thirty minutes").
+_MINUTE_WORDS = dict(_NUM_WORDS)
+_MINUTE_WORDS.update({
+    "quindici": 15, "venti": 20, "trenta": 30, "quaranta": 40,
+    "cinquanta": 50, "sessanta": 60, "novanta": 90,
+    "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "ninety": 90,
+})
+
+
+def _parse_minutes(tail):
+    """A spoken duration ('30 minuti', "mezz'ora", 'an hour') -> minutes, or
+    None when the tail isn't a duration (then the phrase wasn't a sleep
+    command and routing falls through)."""
+    t = (tail or "").strip().lower()
+    if re.match(r"^(?:mezz\W?ora|half\s+an?\s+hour)\b", t):
+        return 30
+    if re.match(r"^(?:un|an|one|1)\W?\s*(?:ora|hour)\b", t):
+        return 60
+    m = re.match(r"^(\d+)\s*(?:ore|hours?)\b", t)
+    if m:
+        return int(m.group(1)) * 60
+    m = re.match(r"^(\d+|[a-zà-ù]+)\s*(?:minut\w*|min\b)", t)
+    if m:
+        token = m.group(1)
+        return int(token) if token.isdigit() else _MINUTE_WORDS.get(token)
+    return None
+
+
 def _c(pattern):  # compiled, case-insensitive
     return re.compile(pattern, re.I)
 
@@ -81,6 +111,11 @@ PATTERNS = {
         "prev": _c(r"\b(precedent|indietro|torna)"),
         "vol_up": _c(r"(alza|aumenta).{0,12}volume|pi[uù] forte"),
         "vol_down": _c(r"(abbassa|diminuisci).{0,12}volume|pi[uù] piano"),
+        # Sleep timer: the captured tail must parse as a duration (see
+        # _parse_minutes), otherwise the phrase falls through to pause/play.
+        "sleep": _c(r"(?:spegni(?:ti)?|ferma(?:ti)?|stop)\b.{0,20}?\b(?:tra|fra)\s+(.+)$"),
+        "sleep_cancel": _c(r"^(?:annulla|cancella|togli)\b.{0,15}"
+                           r"(?:spegnimento|timer|sleep)"),
         "nowplaying": _c(r"(cosa|che).{0,8}(suona|canzone|ascolt)"),
         "choose_number": _c(r"(?:metti|scegli|voglio)?\s*(?:(?:la|il)\s+)?numero\s+([a-z0-9]+)\s*$"),
         # "la 2" and ordinals: "la seconda", "metti la seconda canzone"
@@ -125,6 +160,11 @@ PATTERNS = {
         "vol_down": _c(r"(?:turn|put)?\s*down.{0,12}volume|volume\s+down"
                        r"|(?:lower|decrease|reduce)\s.{0,8}volume|turn\s+it\s+down"
                        r"|quieter|softer"),
+        # Sleep timer: the captured tail must parse as a duration (see
+        # _parse_minutes), otherwise the phrase falls through to pause/play.
+        "sleep": _c(r"(?:sleep|stop|turn\s+off|switch\s+off|shut\s+(?:down|off))"
+                    r"\b.{0,20}?\bin\s+(.+)$"),
+        "sleep_cancel": _c(r"^(?:cancel|clear|remove)\b.{0,15}(?:sleep|timer)"),
         # Loose on purpose (mirrors the Italian style) and gated by is_play in
         # handle(), so "play What Is This Feeling" stays a play command. Also
         # covers the apostrophe-less ASR form "whats playing".
@@ -199,8 +239,13 @@ def _source_suffix(name) -> str:
 
 class Router:
     def __init__(self, lms, default_service="tidal", services=("tidal", "qobuz"),
-                 kidsafe=None, client_id="default"):
+                 kidsafe=None, client_id="default", multiroom=None):
         self.lms = lms
+        # Multi-room (Pro): an injected feature object (pro/multiroom.py) with
+        # a narrow contract — extract_room(text, lang) and pro_ok(). Like
+        # kid-safe, None (the default) disables the feature entirely; the
+        # AGPL router only calls the contract, it owns no room logic.
+        self.multiroom = multiroom
         # Streaming sources this router accepts as a ``source`` value; anything
         # else streams from ``default_service`` (also the "auto" fallback).
         self.default_service = default_service
@@ -214,6 +259,10 @@ class Router:
         # Where those candidates play from ('local' or a service name), so a
         # follow-up pick's confirmation can say the source too.
         self.cand_source = None
+        # (playerid, name) when the list was opened by a room-targeted command,
+        # so «metti la 2» keeps playing in that room; None = default player.
+        self.cand_player = None
+        self._room_turn = False  # this turn already carries a room override
         # True when THIS turn opened a numbered list (a list command or a
         # 'did you mean'), so the web client can render tappable choice buttons
         # only for the reply that offers them, not on every later reply.
@@ -334,6 +383,35 @@ class Router:
         self._guard = (self.kidsafe.guard_for(self.client_id)
                        if self.kidsafe else None)
 
+        # Room targeting (Pro, pro/multiroom.py): a one-shot retarget of this
+        # turn to the named player (the UI selector rules every other turn).
+        target = None
+        if self.multiroom is not None:
+            stripped, target = self.multiroom.extract_room(t, lang)
+            if target is not None:
+                # Answer with the pitch, not a confusing search miss.
+                if not self.multiroom.pro_ok():
+                    return msg("pro_required")
+                t = stripped
+        self._room_turn = target is not None
+        if target is None:
+            result = self._route(t, source, P)
+            if self._opened:
+                self.cand_player = None  # a fresh list belongs to this player
+            return result
+        saved = self.lms
+        self.lms = saved.for_player(target["playerid"])
+        try:
+            result = self._route(t, source, P)
+        finally:
+            self.lms = saved
+        room = target.get("name") or ""
+        if self._opened:
+            # «metti la 2» after a room-opened list keeps playing in that room.
+            self.cand_player = (target["playerid"], room)
+        return self._tag(result, msg("in_room", room=room))
+
+    def _route(self, t: str, source: str, P: dict) -> str:
         # 0) kid-safe voice management (Pro; list/edit gated on the PIN unlock).
         if self.kidsafe:
             m = (P["block_add"].match(t) or P["block_remove"].match(t)
@@ -360,7 +438,17 @@ class Router:
         # stays an explicit pause even with a play verb ("metti in pausa").
         is_play = bool(P["is_play"].search(t))
 
-        # 1) transport & info (source-independent)
+        # 1) transport & info (source-independent). The sleep timer goes first:
+        # «spegni/stop tra 30 minuti» contains transport words, but only counts
+        # when its tail really parses as a duration.
+        if not is_play:
+            if P["sleep_cancel"].search(t):
+                return actions.cancel_sleep(self.lms)
+            m = P["sleep"].search(t)
+            if m:
+                minutes = _parse_minutes(m.group(1))
+                if minutes:
+                    return actions.set_sleep(self.lms, minutes)
         if P["pause_explicit"].search(t) or (not is_play and P["pause"].search(t)):
             return actions.pause(self.lms)
         # Bare "play" is a resume even though "play" is also a play verb.
@@ -389,9 +477,18 @@ class Router:
             bare = re.match(r"([a-z0-9]+)\s*$", t, re.I)
             number = _as_number(bare.group(1), ordinals=True) if bare else None
         if number is not None:
-            return self._tag(actions.choose_from(self.lms, self.candidates, number,
-                                                 guard=self._guard),
-                             _source_suffix(self.cand_source))
+            # A pick from a room-opened list keeps playing in that room (unless
+            # this very turn names another one — then self.lms already points
+            # there and tagging is the caller's job).
+            pick_lms, room_suffix = self.lms, ""
+            if self.cand_player and not self._room_turn:
+                pick_lms = self.lms.for_player(self.cand_player[0])
+                room_suffix = msg("in_room", room=self.cand_player[1])
+            return self._tag(
+                self._tag(actions.choose_from(pick_lms, self.candidates, number,
+                                              guard=self._guard),
+                          _source_suffix(self.cand_source)),
+                room_suffix)
 
         # 3) explicit source override phrases (win over the selector). Service
         # phrases route only the generic play_song; album/artist follow the
@@ -432,12 +529,18 @@ class Router:
         if self.candidates:
             m = P["name_pick"].match(t)
             if m:
+                pick_lms, room_suffix = self.lms, ""
+                if self.cand_player and not self._room_turn:
+                    pick_lms = self.lms.for_player(self.cand_player[0])
+                    room_suffix = msg("in_room", room=self.cand_player[1])
                 chosen = actions.choose_by_name(
-                    self.lms, self.candidates, m.group(1).strip(),
+                    pick_lms, self.candidates, m.group(1).strip(),
                     guard=self._guard
                 )
                 if chosen is not None:
-                    return self._tag(chosen, _source_suffix(self.cand_source))
+                    return self._tag(
+                        self._tag(chosen, _source_suffix(self.cand_source)),
+                        room_suffix)
 
         # 5) album — streaming or local per selector
         m = P["album"].search(t)

@@ -42,9 +42,10 @@ unlocks the hands-free features and funds development:
 |---|---|
 | Typed commands (the text box, works on every device over plain HTTP) | 🎙️ **Microphone** tap-to-talk |
 | All search & playback: local library, TIDAL, Qobuz, "did you mean" with tappable choices | 🪄 **Wake word** («vivavoce metti Time») |
-| Transport & volume, now-playing panel with artwork | 🌍 **Multilingual read-back voices** |
+| Transport, volume slider, sleep timer, now-playing panel with artwork | 🌍 **Multilingual read-back voices** |
 | Docker / Home Assistant add-on / bare Python, HTTPS + PWA install | 🧒 **Kid-safe**: PIN-protected blocklist, enforced server-side on every device |
-| Updates | Future Pro features — and priority on your feedback |
+| Updates | 🛋️ **Multi-room**: room selector + «metti X **in cucina**» voice targeting |
+| | Future Pro features — and priority on your feedback |
 
 Activation is once, online, from the page settings (sold via Lemon Squeezy,
 which handles VAT/invoices); after that the license is cached locally and
@@ -66,6 +67,8 @@ no LLM), so behaviour is testable and repeatable.
 | ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
 | 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
 | 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
+| 🛋️ **Multi-room (Pro)** | With more than one player, pick the room in settings — or retarget a single command by voice: «metti Time **in cucina**», «pausa in salotto». A follow-up «metti la 2» stays in that room. |
+| 😴 **Sleep timer** | «spegni tra 30 minuti» · «stop in half an hour» · «annulla il timer» — the LMS native sleep, armed by voice. |
 | 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("vivavoce" by default): «vivavoce metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
 | 🌍 **Natural multilingual read-back** | Optional, off by default (the transcript is on screen). When on, the Italian frame is spoken by an Italian voice and the title/artist in *their* language (English/Spanish/French/German), with the best natural voices your browser offers — pickable in settings. |
 
@@ -101,7 +104,8 @@ on the page (the whole UI follows):
 > «metti Comfortably Numb dei Pink Floyd» · «metti l'album The Wall» ·
 > «dalla mia musica metti Aerosmith» · «da qobuz metti Time» ·
 > «quali album ho di Yes» → «metti la 2» ·
-> «pausa» · «alza il volume» · «cosa sta suonando»
+> «pausa» · «alza il volume» · «cosa sta suonando» ·
+> «spegni tra 30 minuti» · «metti Time in cucina»
 
 > [!NOTE]
 > The browser microphone needs **HTTPS** when used from another device — the Docker
@@ -129,7 +133,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # 420 tests, no network — uses a simulated LMS transport
+uv run pytest        # 461 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS (read-only, or `--play` to actually play):

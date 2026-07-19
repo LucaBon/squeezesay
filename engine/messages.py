@@ -52,6 +52,9 @@ IT = {
     "previous_track": "Brano precedente.",
     "volume_up": "Volume alzato.",
     "volume_down": "Volume abbassato.",
+    "ask_sleep": "Non ho capito tra quanti minuti spegnere. Puoi ripetere?",
+    "sleep_set": "Va bene, spengo tra {minutes} minuti.",
+    "sleep_cancelled": "Timer di spegnimento annullato.",
     "nothing_playing": "Al momento non sta suonando niente.",
     "now_playing": "Sta suonando {title}.",
     "now_playing_by": "Sta suonando {title} di {artist}.",
@@ -92,6 +95,9 @@ IT = {
     # TIDAL, Qobuz) the reply must say which one answered.
     "from_service": " da {service}",
     "from_local": " dalla tua musica",
+    # Room tag appended when a command targets another player («… in cucina»):
+    # {room} is the player's LMS name, spoken as-is.
+    "in_room": " in {room}",
     "heard_nothing": "Non ho sentito niente.",
     "router_fallback":
         "Non ho capito. Prova con: riproduci, metti l'album, dalla mia musica, "
@@ -141,6 +147,9 @@ EN = {
     "previous_track": "Previous track.",
     "volume_up": "Volume up.",
     "volume_down": "Volume down.",
+    "ask_sleep": "I didn't catch in how many minutes to stop. Can you repeat?",
+    "sleep_set": "Okay, stopping in {minutes} minutes.",
+    "sleep_cancelled": "Sleep timer cancelled.",
     "nothing_playing": "Nothing is playing right now.",
     "now_playing": "Now playing {title}.",
     "now_playing_by": "Now playing {title} by {artist}.",
@@ -181,6 +190,9 @@ EN = {
     # TIDAL, Qobuz) the reply must say which one answered.
     "from_service": " from {service}",
     "from_local": " from your music",
+    # Room tag appended when a command targets another player ("… in the
+    # kitchen"): {room} is the player's LMS name, spoken as-is.
+    "in_room": " in {room}",
     "heard_nothing": "I didn't hear anything.",
     "router_fallback":
         "I didn't understand. Try: play, play the album, from my music, "
