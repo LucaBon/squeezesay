@@ -44,8 +44,9 @@ dell'add-on, quindi l'avviso del browser va accettato una sola volta. Se cambi
 
 - Un LMS/Daphile sulla stessa rete con almeno un player attivo (per TIDAL:
   plugin TIDAL installato e loggato).
-- L'add-on usa la **rete host** (serve per l'auto-discovery UDP e per avere
-  gli IP giusti nel certificato).
+- L'add-on usa la **rete host** (rende immediata l'auto-discovery UDP e mette
+  gli IP giusti nel certificato; senza, la discovery ripiega comunque su una
+  scansione unicast della rete).
 - Il microfono richiede Chrome/Edge; la casella di testo funziona ovunque.
 
 ## Note

@@ -51,6 +51,12 @@ project itself renamed to Lyrion. What this means for existing installs:
 - **Kid-safe on the web app** (Pro): PIN-protected blocklist, enforced
   server-side for every device on the LAN, editable by voice («blocca …»,
   «sblocca …», «quali brani sono bloccati») or from settings.
+- **Auto-discovery from inside Docker bridge/NAT** (free): when the UDP
+  broadcast can't leave the container (Docker Desktop on Windows/Mac, bridge
+  networks), the server now falls back to a **unicast sweep** of the LAN — LMS
+  answers the same discovery request sent host-by-host — and remembers the
+  server in the data volume, so restarts skip discovery entirely.
+  `docker compose up` is zero-config everywhere, not just with host networking.
 
 ### Removed
 

@@ -31,11 +31,14 @@ Everything is configured via environment variables in
 | `VIVAVOCE_MATERIAL_URL` | URL for the "Material Skin" link | `<lms>/material/` |
 
 > [!NOTE]
-> The compose file uses `network_mode: host`, which is what makes auto-discovery and
-> the certificate "just work" — it requires Linux (fine on NAS/Raspberry Pi). On
+> Auto-discovery works in any network mode: broadcast first, and where broadcast
+> can't leave the container (Docker bridge/NAT) the server falls back to a
+> unicast sweep of the LAN, then remembers the LMS in the volume so restarts are
+> instant. The compose file still uses `network_mode: host` (Linux — fine on
+> NAS/Raspberry Pi) because it also puts the right IPs in the certificate. On
 > **Docker Desktop (Windows/Mac)** or bridge networks, follow the comments in
-> [docker-compose.yml](docker-compose.yml): map the port, set `VIVAVOCE_LMS`
-> explicitly, and put the host's LAN IP in `VIVAVOCE_CERT_HOSTS`.
+> [docker-compose.yml](docker-compose.yml): map the port and put the host's LAN
+> IP in `VIVAVOCE_CERT_HOSTS`.
 
 ### Home Assistant add-on
 

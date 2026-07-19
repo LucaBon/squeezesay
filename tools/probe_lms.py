@@ -26,72 +26,33 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import socket
 import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "engine"))
 
 import actions  # noqa: E402
+import discovery  # noqa: E402
 from lms import SERVICES, LMSClient, LMSError, uri_kind  # noqa: E402
-
-
-# -- LAN discovery (Squeezebox TLV protocol, UDP 3483) --------------------
-def _parse_tlv(buf: bytes) -> dict:
-    out, i = {}, 0
-    while i + 5 <= len(buf):
-        tag = buf[i : i + 4].decode("ascii", "replace")
-        length = buf[i + 4]
-        value = buf[i + 5 : i + 5 + length]
-        out[tag] = value.decode("utf-8", "replace")
-        i += 5 + length
-    return out
-
-
-def discover(timeout: float = 2.0) -> list:
-    """Broadcast a discovery request and collect LMS servers on the LAN."""
-    fields = [b"NAME", b"IPAD", b"JSON", b"VERS"]
-    request = b"e" + b"".join(tag + b"\x00" for tag in fields)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.settimeout(timeout)
-    servers, seen = [], set()
-    try:
-        sock.sendto(request, ("255.255.255.255", 3483))
-    except OSError as exc:
-        print(f"[discovery] impossibile inviare broadcast: {exc}")
-        return servers
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            data, addr = sock.recvfrom(2048)
-        except socket.timeout:
-            break
-        except OSError:
-            break
-        if data[:1] != b"E" or addr[0] in seen:
-            continue
-        seen.add(addr[0])
-        tlv = _parse_tlv(data[1:])
-        servers.append({"ip": addr[0], **tlv})
-    sock.close()
-    return servers
 
 
 def resolve_base_url(args) -> str | None:
     if args.url:
         return args.url.rstrip("/")
+    # Stessa discovery del server: broadcast, poi sweep unicast (per chi lancia
+    # il probe da dentro un container o una VM in NAT).
     print("[discovery] cerco un server LMS sulla LAN (UDP 3483)...")
-    servers = discover(timeout=args.discover_timeout)
+    servers = discovery.discover(timeout=args.discover_timeout)
+    if not servers:
+        print("[discovery] nessuna risposta al broadcast: sweep unicast...")
+        servers = discovery.discover_unicast()
     if not servers:
         print("[discovery] nessun server trovato. Riprova con --url http://IP:9000")
         return None
     for srv in servers:
         print(f"  trovato: {srv.get('NAME','?')} @ {srv['ip']} "
               f"(json:{srv.get('JSON','9000')}, vers:{srv.get('VERS','?')})")
-    first = servers[0]
-    port = first.get("JSON") or "9000"
-    return f"http://{first['ip']}:{port}"
+    return discovery.base_url(servers[0])
 
 
 # -- pretty helpers -------------------------------------------------------

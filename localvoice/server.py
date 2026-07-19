@@ -23,6 +23,7 @@ import ssl
 import sys
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -475,6 +476,59 @@ def make_handler(lms, material_url: str, services, default_service: str,
     return Handler
 
 
+# -- Cache della discovery ----------------------------------------------------
+# L'ultimo LMS trovato viene ricordato nella cartella dati (in Docker: il
+# volume persistente): al riavvio niente broadcast né sweep unicast, il server
+# riparte subito. Se l'LMS non risponde più, la cache viene ignorata e la
+# discovery ricomincia da capo.
+
+def _lms_cache_path(data_dir: str) -> str:
+    return os.path.join(data_dir, "discovery_cache.json")
+
+
+def _cached_lms(data_dir: str) -> str:
+    try:
+        with open(_lms_cache_path(data_dir), encoding="utf-8") as f:
+            return json.load(f).get("lms") or ""
+    except (OSError, ValueError):
+        return ""
+
+
+def _save_cached_lms(data_dir: str, url: str) -> None:
+    try:
+        with open(_lms_cache_path(data_dir), "w", encoding="utf-8") as f:
+            json.dump({"lms": url}, f)
+    except OSError:
+        pass  # cartella read-only: pazienza, si riscopre al prossimo avvio
+
+
+def _lms_reachable(url: str, timeout: float = 2.0) -> bool:
+    parts = urllib.parse.urlsplit(url)
+    if not parts.hostname:
+        return False
+    try:
+        socket.create_connection((parts.hostname, parts.port or 9000),
+                                 timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
+# Solo le fasi che meritano una riga: il passaggio allo sweep (il broadcast non
+# esce dai bridge Docker, è il caso normale in container) e l'ultima risorsa.
+_DISCOVERY_PHASES = {
+    "sweep": "Nessuna risposta al broadcast (normale dentro Docker): "
+             "discovery unicast, subnet per subnet...",
+    "full": "Non ancora trovato: scansione completa di 192.168.*...",
+}
+
+
+def _discovery_progress(phase: str) -> None:
+    line = _DISCOVERY_PHASES.get(phase)
+    if line:
+        print(line)
+
+
 def main() -> int:
     # Ogni opzione ha un gemello d'ambiente (PREFIX_LMS, PREFIX_PORT, ...):
     # Docker/HA configurano via env, la riga di comando vince quando presente.
@@ -541,13 +595,19 @@ def main() -> int:
 
     lms_url = args.lms
     if not lms_url:
+        cached = _cached_lms(data_dir)
+        if cached and _lms_reachable(cached):
+            lms_url = cached
+            print(f"LMS: {lms_url} (ricordato dall'ultimo avvio)")
+    if not lms_url:
         print("Cerco un server LMS sulla rete (UDP 3483)...")
-        lms_url = discovery.discover_base_url()
+        lms_url = discovery.discover_base_url(on_progress=_discovery_progress)
         if not lms_url:
             print("Nessun LMS trovato. Riprova indicando l'indirizzo: "
                   "--lms http://IP-DEL-SERVER:9000")
             return 1
         print(f"LMS trovato: {lms_url}")
+        _save_cached_lms(data_dir, lms_url)
 
     # Aspetta che l'LMS risponda anche quando --player è già noto: subito dopo
     # c'è la rilevazione dei servizi streaming, che con la rete giù ripiegherebbe

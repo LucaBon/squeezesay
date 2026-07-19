@@ -30,10 +30,13 @@ services:
       # VIVAVOCE_CERT_HOSTS: "192.168.1.20"        # SAN extra nel certificato (vedi sotto)
 
     # --- Docker Desktop (Windows/Mac) o reti bridge ---------------------------
-    # `network_mode: host` lì non espone davvero la LAN: commentalo, decommenta
-    # `ports`, e imposta esplicitamente VIVAVOCE_LMS (l'auto-discovery UDP non
-    # attraversa il bridge) e VIVAVOCE_CERT_HOSTS con l'IP LAN dell'host (il
-    # container vede solo il proprio IP interno, non quello che userà il telefono).
+    # `network_mode: host` lì non espone davvero la LAN: commentalo e decommenta
+    # `ports`. L'auto-discovery funziona lo stesso: al broadcast (che il bridge
+    # blocca) segue uno sweep unicast della rete, e l'LMS trovato viene
+    # ricordato nel volume per i riavvii. Utile solo VIVAVOCE_CERT_HOSTS con
+    # l'IP LAN dell'host: il container vede il proprio IP interno, non quello
+    # che userà il telefono, e senza il SAN giusto l'avviso del certificato
+    # ricompare.
     # ports:
     #   - "8730:8730"
 
