@@ -379,6 +379,7 @@
         (ogni pochi secondi), e non si può togliere da qui: sul telefono conviene lasciare questa
         opzione spenta e usare il microfono a tocco (un suono solo per comando). La parola chiave dà
         il meglio su PC/tablet con Chrome.</span></div>
+      <label class="hint" id="localasrrow" style="display:none; text-align:left"><input type="checkbox" id="localasr"> <span data-i18n="localasr_lbl">🎙 riconoscimento vocale locale (Whisper sul server: l'audio non esce di casa)</span></label>
       <label class="hint"><input type="checkbox" id="readback"> <span data-i18n="readback_lbl">🔊 leggi la risposta ad alta voce</span></label>
       <div id="probox">
         <div id="prostatus" class="hint"></div>
@@ -557,6 +558,7 @@ const UI_EN = {
     '(every few seconds) and it cannot be silenced from here: on phones, leave this off and ' +
     'use tap-to-talk (one sound per command). The keyword works best on PC/tablet with ' +
     'Chrome.</span>',
+  localasr_lbl: "🎙 local speech recognition (Whisper on the server: audio never leaves home)",
   readback_lbl: "🔊 read the reply aloud",
   voices_summary: "Voices &amp; languages",
   lbl_foreign: "Default language for foreign titles",
@@ -611,6 +613,8 @@ const UI_EN = {
   say_command: "Yes? Tell me the command…",
   tap_mic: "Tap the microphone and speak.",
   mic_error: "Microphone error: ",
+  asr_working: "Transcribing…",
+  asr_failed: "Local recognition failed: using the browser's.",
   lbl_text: "Text command",
   log_label: "Command history",
   np_label: "Now playing",
@@ -674,6 +678,8 @@ const UI_IT = {
   say_command: "Sì? Dimmi il comando…",
   tap_mic: "Tocca il microfono e parla.",
   mic_error: "Errore microfono: ",
+  asr_working: "Trascrivo…",
+  asr_failed: "Riconoscimento locale non riuscito: uso quello del browser.",
   lbl_text: "Comando testuale",
   log_label: "Cronologia comandi",
   np_label: "In riproduzione",
@@ -905,12 +911,14 @@ function applyPro() {
   $("mic").classList.toggle("locked", !PRO);
   $("wakemode").disabled = !PRO;
   $("readback").disabled = !PRO;
+  $("localasr").disabled = !PRO;
   if (!PRO) {
     if ($("wakemode").checked) {
       $("wakemode").checked = false;
       $("wakehint").style.display = "none";
     }
     if ($("readback").checked) { $("readback").checked = false; syncVoicePanel(); }
+    $("localasr").checked = false;
   }
   const st = $("prostatus");
   st.classList.remove("warn");
@@ -1388,11 +1396,121 @@ $("text").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { send($("text").value); $("text").value = ""; }
 });
 
+// Shared by both recognisers (Web Speech and local): put the transcript in
+// the box and either send right away (hands-free) or wait for a check.
+function runCommand(txt, alts) {
+  $("text").value = txt;
+  send(txt, alts);
+  $("text").value = "";
+}
+function handleManualFinal(txt, alts) {
+  $("text").value = txt;
+  if ($("autosend").checked) { runCommand(txt, alts); }
+  else { statusEl.textContent = ui("check_text"); $("text").focus(); }
+}
+function micUI(listening) {
+  $("mic").classList.toggle("listening", listening);
+  $("mic").setAttribute("aria-pressed", listening ? "true" : "false");
+  $("micstate").textContent = listening ? ui("micstate_listening") : ui("micstate_idle");
+}
+
+// --- Local speech recognition (Pro): record with MediaRecorder and let the
+// server's Whisper transcribe (/transcribe) — the audio never leaves the LAN,
+// unlike Web Speech which ships it to Google/Apple. The toggle appears only
+// when GET /asr says the engine is installed; Web Speech stays the default
+// and takes back over for the session on any /transcribe failure.
+let ASR = { available: false };
+let asrFailed = false;   // one failure = fall back to Web Speech until reload
+let localRec = null;     // the active MediaRecorder while capturing
+let localRecTimer = null;
+const LOCALREC_MAX_MS = 30000;  // Web Speech auto-stops; we need our own cap
+
+const canRecord = () => !!(navigator.mediaDevices && window.MediaRecorder);
+const localAsrOn = () =>
+  ASR.available && !asrFailed && canRecord() && $("localasr").checked;
+
+function renderAsrRow() {
+  $("localasrrow").style.display = (ASR.available && canRecord()) ? "" : "none";
+  // A browser without Web Speech (e.g. Firefox) showed "no mic support":
+  // with the server engine there IS a working mic — clear the warning.
+  if (ASR.available && canRecord() && statusBase === "nomic") {
+    statusBase = "default";
+    refreshStatus();
+  }
+}
+async function refreshAsr() {
+  try {
+    const r = await fetch("/asr");
+    ASR = await r.json();
+  } catch (e) { ASR = { available: false }; }
+  renderAsrRow();
+}
+$("localasr").checked = localStorage.getItem("localasr") === "1";
+$("localasr").onchange = () =>
+  localStorage.setItem("localasr", $("localasr").checked ? "1" : "0");
+
+function stopLocalRec() {
+  clearTimeout(localRecTimer);
+  if (localRec && localRec.state !== "inactive") localRec.stop();
+}
+async function startLocalRec() {
+  if (localRec) { stopLocalRec(); return; }  // second tap stops, like Web Speech
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    statusEl.textContent = ui("mic_error") + (e.name || e);
+    return;
+  }
+  const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+    .find(t => MediaRecorder.isTypeSupported(t)) || "";
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    localRec = null;
+    clearTimeout(localRecTimer);
+    micUI(false);
+    transcribeBlob(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+  };
+  localRec = rec;
+  rec.start();
+  micUI(true);
+  statusEl.textContent = ui("listening");
+  localRecTimer = setTimeout(stopLocalRec, LOCALREC_MAX_MS);
+}
+async function transcribeBlob(blob) {
+  statusEl.textContent = ui("asr_working");
+  try {
+    const r = await fetch("/transcribe?lang=" + encodeURIComponent(recLang()), {
+      method: "POST",
+      headers: { "Content-Type": blob.type || "application/octet-stream" },
+      body: blob
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || "transcribe failed");
+    const text = (d.text || "").trim();
+    if (!text) { statusEl.textContent = ui("tap_mic"); return; }  // silence
+    const alts = (d.alternatives || []).filter(a => a && a.trim());
+    handleManualFinal(text, alts.length ? alts : [text]);
+  } catch (e) {
+    asrFailed = true;  // Web Speech takes over for the rest of the session
+    statusEl.textContent = ui("asr_failed");
+  }
+}
+
 // --- Speech recognition (Web Speech API) ---
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const mic = $("mic");
 if (!SR) {
   statusBase = "nomic";
+  // No Web Speech (e.g. Firefox): the mic can still work through the server's
+  // local recognition once /asr says it's installed and the toggle is on.
+  mic.onclick = () => {
+    if (!PRO) { showProUpsell(); return; }
+    if (localAsrOn()) startLocalRec(); else refreshStatus();
+  };
 } else if (!window.isSecureContext && location.hostname !== "localhost"
            && location.hostname !== "127.0.0.1") {
   statusBase = "nohttps";
@@ -1467,16 +1585,6 @@ if (!SR) {
     return null;
   }
 
-  function runCommand(txt, alts) {
-    $("text").value = txt;
-    send(txt, alts);
-    $("text").value = "";
-  }
-  function handleManualFinal(txt, alts) {
-    $("text").value = txt;
-    if ($("autosend").checked) { runCommand(txt, alts); }
-    else { statusEl.textContent = ui("check_text"); $("text").focus(); }
-  }
   // Wake mode is CONTINUOUS: the recogniser finalises a long phrase in pieces,
   // so acting on each piece would fire half-typed commands ("metti Don't",
   // "metti Don't stop", ...). Instead we accumulate the whole utterance and send
@@ -1524,18 +1632,17 @@ if (!SR) {
     // Il microfono è una funzione Pro: da bloccato porta al pannello licenza.
     if (!PRO) { showProUpsell(); return; }
     if ($("wakemode").checked) { if (active) stopAll(); else startWake(); }
+    // The local-recognition toggle only replaces tap-to-talk: the wake word
+    // needs continuous listening, which stays on Web Speech.
+    else if (localAsrOn()) startLocalRec();
     else startManual();
   };
   rec.onstart = () => {
-    active = true; mic.classList.add("listening");
-    mic.setAttribute("aria-pressed", "true");
-    $("micstate").textContent = ui("micstate_listening");
+    active = true; micUI(true);
     statusEl.textContent = mode === "wake" ? ui("listening_wake")(wakeWord()) : ui("listening");
   };
   rec.onend = () => {
-    active = false; mic.classList.remove("listening");
-    mic.setAttribute("aria-pressed", "false");
-    $("micstate").textContent = ui("micstate_idle");
+    active = false; micUI(false);
     if (mode === "wake") {  // keep listening (mobile/Chrome auto-stop after a pause)
       setTimeout(() => { if (mode === "wake" && !active) { try { rec.start(); } catch (e) {} } }, 350);
     } else { mode = "off"; statusEl.textContent = ui("tap_mic"); }
@@ -1578,6 +1685,7 @@ applyUI();
 // the gap and offline opens).
 refreshLicense();
 refreshKidsafe();
+refreshAsr();
 
 // First-ever visit: open the settings panel so language and source get noticed.
 if (!localStorage.getItem("reclang") && !localStorage.getItem("source")) {

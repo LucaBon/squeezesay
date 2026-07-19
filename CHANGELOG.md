@@ -30,6 +30,15 @@ project itself renamed to Lyrion. What this means for existing installs:
   keeps playing in that room. Enforced server-side, like kid-safe.
 - **Sleep timer** (free): «spegni tra 30 minuti», «stop in half an hour»,
   «annulla il timer» — the LMS native sleep timer, armed by voice.
+- **Local speech recognition** (Pro, `localvoice/pro/asr.py`, optional
+  install): the mic can transcribe on *your* server with **faster-whisper**
+  instead of the browser's cloud engine — the audio never leaves the LAN,
+  closing the one non-local step in the privacy story. Enable with
+  `uv sync --group asr` (or the Docker `--build-arg ASR=1` image) and flip
+  «riconoscimento vocale locale» in settings; Web Speech remains the default
+  and the automatic fallback. Model configurable with `--asr-model` /
+  `VIVAVOCE_ASR_MODEL` (default `small`), cached in the data directory. As a
+  bonus, the mic now also works on browsers without Web Speech (Firefox).
 - **LMS status lamp** (free): the header LED turns red — with a clear message —
   when the music server is unreachable, instead of failing silently.
 - **Vivavoce Pro** — one-time license (11,90 €; launch price 8,90 €) that

@@ -14,8 +14,11 @@ sends **none of it** anywhere.
 If you don't want any audio leaving your home:
 
 - use the **text box** (free tier, works everywhere) — fully local;
-- a fully offline wake-word + speech-recognition mode is on the roadmap,
-  precisely to close this gap.
+- turn on **local speech recognition** (Pro, optional install — see
+  [DEPLOY.md](DEPLOY.md)): a Whisper model on *your* server transcribes the
+  mic audio on-box, so voice goes browser → your machine and no further. The
+  only network touch is the one-time model download (listed below). The
+  wake word still relies on the browser engine for its continuous listening.
 
 ## What stays on your LAN
 
@@ -38,6 +41,9 @@ If you don't want any audio leaving your home:
    turns Pro off. Opt out entirely with `VIVAVOCE_NO_REVALIDATE=1`.
 3. **Album artwork** — fetched by the server from your LMS (or from the URL
    your streaming plugin reports) and proxied to the page.
+4. **Whisper model download** — only if you enable local speech recognition:
+   the first transcription downloads the chosen model once from Hugging Face
+   into the data directory. After that it loads from disk, fully offline.
 
 ## Payments
 

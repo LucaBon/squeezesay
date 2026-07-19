@@ -15,6 +15,13 @@ ENV PYTHONUNBUFFERED=1
 # cryptography serve solo a generare il certificato self-signed al primo avvio.
 RUN pip install --no-cache-dir "cryptography>=42.0"
 
+# Variante ASR (opzionale): --build-arg ASR=1 preinstalla faster-whisper per
+# il riconoscimento vocale locale (endpoint /transcribe, funzione Pro).
+# Aggiunge ~600 MB all'immagine; il modello Whisper viene scaricato al primo
+# uso dentro /data (il volume), quindi sopravvive agli aggiornamenti.
+ARG ASR=0
+RUN if [ "$ASR" = "1" ]; then pip install --no-cache-dir "faster-whisper>=1.0"; fi
+
 WORKDIR /app
 COPY engine/ engine/
 COPY localvoice/ localvoice/

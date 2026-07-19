@@ -87,6 +87,42 @@ Re-issuing the server cert for new IPs reuses the CA, so devices stay trusted.
 
 The **text box works everywhere**, even over HTTP.
 
+### Local speech recognition (Pro, optional)
+
+By default the mic uses the browser's speech engine, which sends the audio to
+Google (Chrome) or Apple (Safari) for transcription — the one non-local step in
+the whole app. Installing the optional **asr** group moves transcription onto
+*your* server with [faster-whisper](https://github.com/SYSTRAN/faster-whisper):
+the page records the command and POSTs it to `/transcribe`, and no audio ever
+leaves the LAN. A new settings switch («🎙 riconoscimento vocale locale»)
+appears once the server reports the engine installed; the browser engine stays
+the default and the automatic fallback if a transcription fails.
+
+```bash
+uv sync --group asr                      # the core stays dependency-free without it
+uv run python localvoice/server.py       # "Riconoscimento vocale locale attivo"
+```
+
+- **Model**: `--asr-model` or `VIVAVOCE_ASR_MODEL` (default `small`; `tiny`
+  and `base` are faster and lighter, `medium` more accurate). Runs int8 on
+  CPU — no GPU needed. The model is downloaded once, on the first
+  transcription, into the data directory (`asr-models/`), so in Docker it
+  lands in the persistent volume.
+- **Docker**: build the ASR variant with
+  `docker build --build-arg ASR=1 -t vivavoce:asr .` (adds ~600 MB to the
+  image), or add the build arg under `build:` in your compose file. The
+  standard image ships without it and reports `/asr` as unavailable.
+- **Home Assistant add-on**: the published add-on image doesn't include the
+  engine (it would double its size for everyone). If you want it on HA, build
+  the add-on locally with the same `ASR=1` build arg, or run the ASR Docker
+  image alongside HA.
+- **Hardware expectations**: with the default `small` model, a 3–5 s spoken
+  command transcribes in roughly **2–4 s on an Intel N100 / Raspberry Pi 5**
+  class box, using ~0.7–1 GB of RAM during the call (nothing while idle:
+  the model loads lazily on first use, which also adds a one-time delay).
+  `base` roughly halves latency and memory at some accuracy cost — a good
+  fit for a Pi 4. Language follows the page's mic-language selector (it/en).
+
 ### Autostart
 
 - **Docker:** nothing to do — `restart: unless-stopped` in the compose file already

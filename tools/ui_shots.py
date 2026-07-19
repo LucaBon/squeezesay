@@ -130,6 +130,15 @@ def main():
                 " document.getElementById('kidsafebox').scrollIntoView();")
             page.wait_for_timeout(300)
             page.screenshot(path=OUT / f"07-kidsafe-{scheme}.png")
+            # Local speech recognition row (Pro, shown when /asr is available).
+            page.evaluate(
+                "ASR = {available: true, model: 'small'}; renderAsrRow();"
+                " document.getElementById('localasr').checked = true;"
+                " document.getElementById('settings').open = true;"
+                " document.getElementById('localasrrow')"
+                "   .scrollIntoView({block: 'center'});")
+            page.wait_for_timeout(300)
+            page.screenshot(path=OUT / f"08-localasr-{scheme}.png")
             # LMS unreachable: red header lamp + warning status line.
             page.evaluate("window.scrollTo(0, 0); window._realSetLmsDown(true)")
             page.wait_for_timeout(300)

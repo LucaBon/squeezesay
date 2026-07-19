@@ -45,6 +45,7 @@ unlocks the hands-free features and funds development:
 | Transport, volume slider, sleep timer, now-playing panel with artwork | 🌍 **Multilingual read-back voices** |
 | Docker / Home Assistant add-on / bare Python, HTTPS + PWA install | 🧒 **Kid-safe**: PIN-protected blocklist, enforced server-side on every device |
 | Updates | 🛋️ **Multi-room**: room selector + «metti X **in cucina**» voice targeting |
+| | 🏠 **Local speech recognition**: Whisper on *your* server — mic audio never leaves the LAN |
 | | Future Pro features — and priority on your feedback |
 
 Activation is once, online, from the page settings (sold via Lemon Squeezy,
@@ -67,6 +68,7 @@ no LLM), so behaviour is testable and repeatable.
 | ❓ **"Did you mean" (top 3)** | When genuinely different songs match, it reads back the top three and you answer «metti la 2» — the choices are also **tappable buttons**. Exact matches just play; junk never wins. |
 | 📀 **Local library scored too** | A generic word like "love" never plays an unrelated album, and "aerosmith" plays the *artist*, not a random album. |
 | 👂 **Mishearing resilience** | The web app tries the browser's alternative transcriptions until one hits (English names that it-IT often mangles). |
+| 🏠 **Local speech recognition (Pro)** | By default the mic uses the browser's engine (audio goes to Google/Apple — the one non-local step). One switch in settings moves transcription to a **Whisper** model on your own server instead: voice never leaves your LAN. Optional install, see [DEPLOY.md](DEPLOY.md). |
 | 🛋️ **Multi-room (Pro)** | With more than one player, pick the room in settings — or retarget a single command by voice: «metti Time **in cucina**», «pausa in salotto». A follow-up «metti la 2» stays in that room. |
 | 😴 **Sleep timer** | «spegni tra 30 minuti» · «stop in half an hour» · «annulla il timer» — the LMS native sleep, armed by voice. |
 | 🪄 **Wake word (web app)** | Optionally arm a spoken keyword ("vivavoce" by default): «vivavoce metti Time» — no touching the screen. Off by default; otherwise the mic is tap-to-talk. |
@@ -133,7 +135,7 @@ There's a link to Material Skin right in the page for when you want to browse vi
 ## Tests
 
 ```bash
-uv run pytest        # 461 tests, no network — uses a simulated LMS transport
+uv run pytest        # 473 tests, no network — uses a simulated LMS transport
 ```
 
 Validate against a real LMS (read-only, or `--play` to actually play):

@@ -120,7 +120,7 @@ def _http_fetch(url: str, timeout: float = 5.0):
 
 def make_handler(lms, material_url: str, services, default_service: str,
                  ca_path=None, artwork_fetch=_http_fetch, license_mgr=None,
-                 kidsafe=None, multiroom=None):
+                 kidsafe=None, transcriber=None, multiroom=None):
     # One Router (and thus its "metti la N" list state) per browser/client id
     # AND per selected player, so two phones — or one phone switched between
     # rooms — don't clobber each other's numbered list. Clients send a stable
@@ -182,10 +182,68 @@ def make_handler(lms, material_url: str, services, default_service: str,
             elif self.path == "/license":
                 status = license_mgr.status() if license_mgr else {"pro": False}
                 self._send(200, json.dumps(status))
+            elif self.path.startswith("/asr"):
+                self._asr_status()
             elif self.path.startswith("/kidsafe"):
                 self._kidsafe_status()
             else:
                 self._send(404, "not found", "text/plain")
+
+        def _asr_status(self):
+            # La pagina mostra l'interruttore «riconoscimento locale» solo se
+            # il motore c'è davvero (gruppo opzionale "asr" installato).
+            ok = transcriber is not None and transcriber.available()
+            payload = {"available": ok}
+            if ok:
+                payload["model"] = getattr(transcriber, "model_name", None)
+            self._send(200, json.dumps(payload))
+
+        # Un comando parlato dura pochi secondi: 15 MB coprono con margine
+        # anche un wav non compresso, e tolgono senso a un upload-bomba.
+        MAX_AUDIO_BYTES = 15 * 1024 * 1024
+
+        def _transcribe(self):
+            # Il corpo è il blob audio di MediaRecorder (webm/opus o wav),
+            # la lingua viaggia nella query string. Come gli altri endpoint:
+            # mai un 5xx — i casi degradati rispondono 200 con ok:false.
+            length = int(self.headers.get("Content-Length", 0) or 0)
+
+            def refuse(error):
+                if length:  # drena il corpo: keep-alive pulito anche su rifiuto
+                    self.rfile.read(length)
+                self._send(200, json.dumps({"ok": False, "error": error}))
+
+            if transcriber is None or not transcriber.available():
+                refuse("unavailable")
+                return
+            # Funzione Pro, applicata lato server come il kid-safe: il toggle
+            # nascosto nella UI non basta a proteggere la CPU del server.
+            if license_mgr and not license_mgr.is_pro():
+                refuse("pro_required")
+                return
+            if not length:
+                refuse("empty")
+                return
+            if length > self.MAX_AUDIO_BYTES:
+                refuse("too_large")
+                return
+            audio = self.rfile.read(length)
+            from urllib.parse import parse_qs, urlparse
+            query = parse_qs(urlparse(self.path).query)
+            lang = (query.get("lang") or ["it"])[0]
+            try:
+                result = transcriber.transcribe(audio, lang)
+            except Exception as exc:
+                self._send(200, json.dumps({"ok": False, "error": str(exc)}))
+                return
+            text = (result.get("text") or "").strip()
+            alternatives = [a for a in (result.get("alternatives") or [])
+                            if a and a.strip()]
+            if not alternatives and text:
+                alternatives = [text]
+            self._send(200, json.dumps(
+                {"ok": True, "text": text, "alternatives": alternatives},
+                ensure_ascii=False))
 
         def _kidsafe_state(self, client_id: str) -> dict:
             state = {
@@ -376,6 +434,9 @@ def make_handler(lms, material_url: str, services, default_service: str,
             if self.path == "/player":
                 self._player_action()
                 return
+            if self.path.startswith("/transcribe"):
+                self._transcribe()
+                return
             if self.path != "/command":
                 self._send(404, '{"speech":"non trovato"}')
                 return
@@ -443,12 +504,29 @@ def main() -> int:
                     default=appdata.env("DEFAULT_SERVICE", "tidal"),
                     help="servizio streaming usato in modalità automatica e "
                          "quando la frase non ne nomina uno (default: tidal)")
+    ap.add_argument("--asr-model",
+                    default=appdata.env("ASR_MODEL", "small"),
+                    help="modello Whisper per il riconoscimento vocale locale "
+                         "(tiny/base/small/medium...; default: small). Serve "
+                         "il gruppo opzionale: uv sync --group asr")
     args = ap.parse_args()
     data_dir = appdata.data_dir(args.data_dir)
     license_mgr = licensing.LicenseManager(data_dir)
     license_mgr.revalidate_async()  # settimanale, best-effort, mai bloccante
     from pro.kidsafe import KidSafe
     kidsafe = KidSafe(data_dir, license_mgr)
+    # Riconoscimento vocale locale (Pro): costruito sempre, il modello si
+    # carica solo al primo /transcribe. I modelli finiscono nella cartella
+    # dati (in Docker: il volume persistente), non nell'immagine.
+    from pro.asr import WhisperTranscriber
+    transcriber = WhisperTranscriber(
+        args.asr_model, cache_dir=os.path.join(data_dir, "asr-models"))
+    if transcriber.available():
+        print(f"Riconoscimento vocale locale attivo (faster-whisper, "
+              f"modello {args.asr_model}): l'audio del microfono resta in casa.")
+    else:
+        print("Riconoscimento vocale locale non installato: il microfono usa "
+              "il riconoscimento del browser. Per attivarlo: uv sync --group asr")
 
     lms_url = args.lms
     if not lms_url:
@@ -521,7 +599,8 @@ def main() -> int:
         (args.host, args.port),
         make_handler(client, material_url, services, default_service,
                      ca_path=ca_path, license_mgr=license_mgr,
-                     kidsafe=kidsafe, multiroom=multiroom),
+                     kidsafe=kidsafe, transcriber=transcriber,
+                     multiroom=multiroom),
     )
 
     scheme = "http"
